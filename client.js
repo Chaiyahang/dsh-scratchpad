@@ -948,7 +948,7 @@ window.__ModuleLoader__.load({
       return h(ComposerHandoffEffect, props);
     }
 
-    function ComposerHandoffEffect({ useInput, inputActions, sessions, sessionId, t }) {
+    function ComposerHandoffEffect({ useInput, inputActions, sessions, getSessions, sessionId, t }) {
       const draft = useInput((state) => (state && typeof state.draft === 'string' ? state.draft : ''));
       useEffect(() => {
         const pending = takeComposerText();
@@ -972,24 +972,26 @@ window.__ModuleLoader__.load({
         insertWithRetry(pending.text, true);
         const attach = async () => {
           if (pending.attachments.length === 0) return;
+          const resolvedSessions = typeof getSessions === 'function' ? getSessions() : sessions;
           const result = await attachConversationFiles({
             attachments: pending.attachments,
             sessionId,
-            sessions,
+            sessions: resolvedSessions,
             inputActions,
             readFile: fetchScratchpadBlob,
           });
           if (cancelled || result.failed.length === 0) return;
           // The composer could not take the files; leave their names in the draft
           // so the Agent still knows what the note carried.
-          insertWithRetry(`${t('note.attachments')}: ${result.failed.map((attachment) => attachment.name).join(', ')}`, false);
+          const label = typeof t === 'function' ? t('note.attachments') : 'Attachments';
+          insertWithRetry(`${label}: ${result.failed.map((attachment) => attachment.name).join(', ')}`, false);
         };
         void attach();
         return () => {
           cancelled = true;
           window.clearTimeout(timer);
         };
-      }, [draft, inputActions, sessionId, sessions, t]);
+      }, [draft, inputActions, sessionId, sessions, getSessions, t]);
       return null;
     }
 
@@ -1783,7 +1785,7 @@ window.__ModuleLoader__.load({
           name: 'conversation.input.left',
           id: 'scratchpad-composer-bridge',
           order: 1000,
-          inject: () => ({ sessions: ctx.get('sessions'), t }),
+          inject: () => ({ sessions: ctx.get('sessions'), getSessions: () => ctx.get('sessions'), t }),
         }, ComposerHandoffBridge));
 
         // In-app wake-up shortcut. Registration is optional: a host without the
