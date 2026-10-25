@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   publish:
+    # Enable after npm Trusted Publishing is configured:
+    #   gh variable set NPM_TRUSTED_PUBLISHING --body true
+    if: vars.NPM_TRUSTED_PUBLISHING == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

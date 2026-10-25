@@ -99,7 +99,9 @@ git tag vX.Y.Z
 git push origin vX.Y.Z
 ```
 
-`.github/workflows/publish.yml` 会校验 tag 与 `package.json` 版本一致、跑测试，然后用 `--provenance` 发布到 npm。首次使用前需在 npm 包设置的 Trusted Publishing 中登记仓库与工作流文件名。
+`.github/workflows/publish.yml` 会校验 tag 与 `package.json` 版本一致、跑测试，然后用 `--provenance` 发布到 npm。
+
+首次启用前：在 npm 包设置 → Trusted Publisher 登记 `Chaiyahang/dsh-scratchpad` + `publish.yml`，然后设置仓库变量 `NPM_TRUSTED_PUBLISHING=true`（未设置时工作流会跳过，不会误报失败）。
 
 ## 链接
 
