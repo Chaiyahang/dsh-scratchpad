@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2 — 2026-10-25
+
+### Changed
+
+- 验证 npm Trusted Publishing（OIDC）：本版本由 GitHub Actions 自动发布，无功能变更
+- 发布工作流启用仓库变量 `NPM_TRUSTED_PUBLISHING=true`
+
 ## 0.2.1 — 2026-10-25
 
 ### Added
