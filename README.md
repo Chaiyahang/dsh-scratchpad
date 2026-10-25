@@ -18,7 +18,13 @@
 
 ## 安装
 
-当前推荐本地目录安装（在 DSH 中让 Agent 执行，或使用插件管理器）：
+从 GitHub 安装（尚未发布 npm）：
+
+```bash
+dsh plugin --profile <profile> add github:Chaiyahang/dsh-scratchpad
+```
+
+也可以让 DSH 的插件管理器安装本地目录：
 
 ```
 plugin_manager install_bundle /绝对路径/到/dsh-scratchpad
