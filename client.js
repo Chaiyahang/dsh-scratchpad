@@ -14,6 +14,8 @@ window.__ModuleLoader__.load({
 
     /** Locale namespace and the `main` key / sidebar id share one identifier. */
     const NS = 'scratchpad';
+    /** Keep in sync with package.json; tests/version.test.mjs guards the pair. */
+    const VERSION = '0.1.1';
     const PANEL_ID = 'scratchpad';
     const PANEL_ORDER = 24;
     const STYLE_ID = '@chaiyahang/dsh-scratchpad/panel.css';
@@ -28,6 +30,7 @@ window.__ModuleLoader__.load({
       en: {
         'panel.title': 'Scratchpad',
         'panel.subtitle': 'Capture an idea, keep it. Saved by the Host, readable by the Agent.',
+        'panel.version': 'Version',
         'panel.new': 'New note',
         'panel.search': 'Search notes',
         'panel.listTitle': 'All notes',
@@ -76,6 +79,7 @@ window.__ModuleLoader__.load({
       zh: {
         'panel.title': '便签',
         'panel.subtitle': '随手记下想法；Host 持久化，Agent 也能读写。',
+        'panel.version': '版本',
         'panel.new': '新建便签',
         'panel.search': '搜索便签',
         'panel.listTitle': '全部便签',
@@ -132,6 +136,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__titleRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .dsh-sp__title{margin:0;font-size:17px;font-weight:600;line-height:1.3;color:var(--dsw-alias-label-primary)}
 .dsh-sp__kbd{flex:none;border:1px solid var(--dsw-alias-border-l1);border-radius:5px;padding:1px 5px;font-size:10.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);font-family:inherit;white-space:nowrap}
+.dsh-sp__version{flex:none;font-size:11px;line-height:1.5;color:var(--dsw-alias-label-secondary);opacity:.8;font-family:inherit;white-space:nowrap}
 .dsh-sp__subtitle{margin:3px 0 0;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
 .dsh-sp__search{flex:0 1 260px;min-width:140px;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;line-height:1.4;outline:none;transition:border-color .12s ease}
 .dsh-sp__search::placeholder{color:var(--dsw-alias-label-secondary);opacity:.85}
@@ -1461,7 +1466,8 @@ window.__ModuleLoader__.load({
             h('div', { className: 'dsh-sp__titles' },
               h('div', { className: 'dsh-sp__titleRow' },
                 h('h1', { className: 'dsh-sp__title' }, t('panel.title')),
-                hint ? h('kbd', { className: 'dsh-sp__kbd', title: t('shortcut.open') }, hint) : null),
+                hint ? h('kbd', { className: 'dsh-sp__kbd', title: t('shortcut.open') }, hint) : null,
+                h('span', { className: 'dsh-sp__version', title: `${t('panel.version')} ${VERSION}` }, `v${VERSION}`)),
               h('p', { className: 'dsh-sp__subtitle' }, t('panel.subtitle'))),
             h('input', {
               type: 'search',

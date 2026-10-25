@@ -1,6 +1,6 @@
 {
   "name": "@chaiyahang/dsh-scratchpad",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scratchpad panel for DeepSeek Harness: many tagged notes, autosave, image and file attachments, Markdown preview with clickable tasks, send-to-chat, a wake-up shortcut, JSON export/import, and Agent tools over Host-side storage.",
   "license": "MIT",
   "author": "chaiyahang",
