@@ -1,0 +1,50 @@
+{
+  "name": "@chaiyahang/dsh-scratchpad",
+  "version": "0.1.0",
+  "description": "Scratchpad panel for DeepSeek Harness: many tagged notes, autosave, image and file attachments, Markdown preview with clickable tasks, send-to-chat, a wake-up shortcut, JSON export/import, and Agent tools over Host-side storage.",
+  "license": "MIT",
+  "author": "chaiyahang",
+  "type": "module",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "notes",
+    "scratchpad",
+    "markdown",
+    "todo",
+    "tags",
+    "client-plugin"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "scripts": {
+    "test": "node tests/run.mjs"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.1-rc.2"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}

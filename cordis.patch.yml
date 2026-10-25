@@ -1,0 +1,4 @@
+# Inserts the scratchpad panel bundle into the current profile.
+- insert:
+    - id: scratchpad-panel
+      name: '@chaiyahang/dsh-scratchpad'

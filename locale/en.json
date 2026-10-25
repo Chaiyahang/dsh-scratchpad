@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Scratchpad",
+    "description": "A quick capture panel in the left sidebar: many notes with tags, saved as you type, image and file attachments, Markdown preview with clickable task lists, one-click handoff to the conversation, a wake-up shortcut, and JSON export/import including attachments. Notes live in the Host data directory, so the Agent can read and write them too."
+  }
+}
