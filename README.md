@@ -26,13 +26,13 @@
 从 npm 安装：
 
 ```bash
-dsh plugin --profile <profile> add @chaiyahang/dsh-scratchpad
+dsh plugin --profile PROFILE add @chaiyahang/dsh-scratchpad
 ```
 
 或直接从 GitHub 安装（跟随默认分支）：
 
 ```bash
-dsh plugin --profile <profile> add github:Chaiyahang/dsh-scratchpad
+dsh plugin --profile PROFILE add github:Chaiyahang/dsh-scratchpad
 ```
 
 也可以让 DSH 的插件管理器安装本地目录：
@@ -89,6 +89,17 @@ npm test
 ```
 
 测试覆盖 5 个文件：Handler 行为（CRUD/附件/导入导出/标签）、路由注册与热重载容错、附件转移（成功/锁定回滚/缺失/无服务）、Markdown 渲染、面板版本与 `package.json` 一致性。
+
+## 发布（维护者）
+
+发布走 npm Trusted Publishing（GitHub Actions OIDC），不需要 token：
+
+```bash
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+`.github/workflows/publish.yml` 会校验 tag 与 `package.json` 版本一致、跑测试，然后用 `--provenance` 发布到 npm。首次使用前需在 npm 包设置的 Trusted Publishing 中登记仓库与工作流文件名。
 
 ## 链接
 

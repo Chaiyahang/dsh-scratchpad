@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1 — 2026-10-25
+
+### Added
+
+- `.github/workflows/publish.yml`：打 `v*` tag 时通过 npm Trusted Publishing（OIDC）自动发布，带 provenance，无需 long-lived token
+- README 增加维护者发布说明
+
+### Fixed
+
+- README 安装示例中的 `<profile>` 占位符（npm 渲染时会当作 HTML 吃掉），改为 `PROFILE`
+
 ## 0.2.0 — 2026-10-25
 
 ### Changed
