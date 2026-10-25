@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 — 2026-10-25
+
+### Changed
+
+- 「发送到对话」现在把图片/文件作为**真实附件**送入 composer：先取回 Host 文件，再通过会话自身的草稿附件通道（`createDrafts` + `addAttachments`）挂到输入框，图片按图片发送、文件走后台上传
+- 如果 composer 拒绝附件（锁定、类型不支持、没有会话服务），正文后仍会补上附件名作为兜底，不会静默丢失
+
+### Added
+
+- `tests/attach.test.mjs` 覆盖附件转移：成功、composer 锁定回滚、部分文件缺失、无会话服务
+
 ## 0.1.1 — 2026-10-25
 
 ### Added

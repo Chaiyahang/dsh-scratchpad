@@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
     /** Locale namespace and the `main` key / sidebar id share one identifier. */
     const NS = 'scratchpad';
     /** Keep in sync with package.json; tests/version.test.mjs guards the pair. */
-    const VERSION = '0.1.1';
+    const VERSION = '0.2.0';
     const PANEL_ID = 'scratchpad';
     const PANEL_ORDER = 24;
     const STYLE_ID = '@chaiyahang/dsh-scratchpad/panel.css';
@@ -299,28 +299,82 @@ window.__ModuleLoader__.load({
      * never receives a draft the user no longer expects.
      */
     const HANDOFF_TTL = 20000;
-    const composerHandoff = { text: '', at: 0 };
+    const composerHandoff = { text: '', attachments: [], at: 0 };
 
-    function queueComposerText(text) {
+    function queueComposerText(text, attachments = []) {
       composerHandoff.text = text;
+      composerHandoff.attachments = attachments;
       composerHandoff.at = Date.now();
     }
 
     function takeComposerText() {
-      const text = composerHandoff.text;
+      const { text, attachments, at } = composerHandoff;
       composerHandoff.text = '';
-      if (text === '' || Date.now() - composerHandoff.at > HANDOFF_TTL) return '';
-      return text;
+      composerHandoff.attachments = [];
+      if ((text === '' && attachments.length === 0) || Date.now() - at > HANDOFF_TTL) return null;
+      return { text, attachments };
     }
 
-    /** The message a note becomes in the conversation: text first, attachments named. */
-    function conversationMessageOf(note, t) {
-      const text = typeof note.text === 'string' ? note.text : '';
-      const parts = [text.trim() === '' ? t('note.untitled') : text];
-      if (Array.isArray(note.attachments) && note.attachments.length > 0) {
-        parts.push(`${t('note.attachments')}: ${note.attachments.map((attachment) => attachment.name).join(', ')}`);
+    /** Read one Host attachment into a browser Blob for the composer intake. */
+    async function fetchScratchpadBlob(attachment) {
+      try {
+        const response = await fetch(`${API}/files?id=${encodeURIComponent(attachment.id)}`, { cache: 'no-store' });
+        if (!response.ok) return null;
+        return await response.blob();
+      } catch {
+        return null;
       }
-      return parts.join('\n\n');
+    }
+
+    /**
+     * Attach Host files through the conversation's own draft-attachment path: the
+     * same `createDrafts` + `addAttachments` pair the composer uses for drops and
+     * pastes, so images are encoded and files staged exactly like a user upload.
+     *
+     * @returns draft descriptors that were added, and the attachments that were not.
+     */
+    async function attachConversationFiles({ attachments, sessionId, sessions, inputActions, readFile }) {
+      const failed = [];
+      if (!Array.isArray(attachments) || attachments.length === 0) return { attached: [], failed };
+      if (sessionId === undefined || typeof inputActions?.addAttachments !== 'function') {
+        return { attached: [], failed: [...attachments] };
+      }
+      let conversation;
+      try {
+        conversation = sessions?.scope?.(sessionId)?.get?.('conversation');
+      } catch {}
+      if (!conversation || typeof conversation.createDrafts !== 'function') {
+        return { attached: [], failed: [...attachments] };
+      }
+      const files = [];
+      for (const attachment of attachments) {
+        try {
+          const blob = await readFile(attachment);
+          if (!blob) {
+            failed.push(attachment);
+            continue;
+          }
+          files.push(new File([blob], attachment.name || 'attachment', { type: attachment.type || blob.type || '' }));
+        } catch {
+          failed.push(attachment);
+        }
+      }
+      if (files.length === 0) return { attached: [], failed };
+      let drafts;
+      try {
+        drafts = conversation.createDrafts(sessionId, files);
+      } catch {
+        return { attached: [], failed: [...attachments] };
+      }
+      try {
+        if (inputActions.addAttachments(drafts.map((draft) => draft.id)) === false) throw new Error('composer locked');
+        return { attached: drafts, failed };
+      } catch {
+        try {
+          conversation.releaseDraftAttachments?.(drafts);
+        } catch {}
+        return { attached: [], failed: [...attachments] };
+      }
     }
 
     // ---------------------------------------------------------------------
@@ -894,33 +948,48 @@ window.__ModuleLoader__.load({
       return h(ComposerHandoffEffect, props);
     }
 
-    function ComposerHandoffEffect({ useInput, inputActions }) {
+    function ComposerHandoffEffect({ useInput, inputActions, sessions, sessionId, t }) {
       const draft = useInput((state) => (state && typeof state.draft === 'string' ? state.draft : ''));
       useEffect(() => {
         const pending = takeComposerText();
-        if (pending === '') return undefined;
+        if (pending === null || inputActions === undefined) return undefined;
         let cancelled = false;
         let timer = 0;
-        const place = (attempt) => {
-          if (cancelled || inputActions === undefined) return;
-          if (draft.trim() === '') {
-            inputActions.setDraft(pending);
+        const insertWithRetry = (text, allowReplace, attempt = 0) => {
+          if (cancelled || text === '') return;
+          if (draft.trim() === '' && allowReplace) {
+            inputActions.setDraft(text);
             return;
           }
           const span = inputActions.captureInsertion();
-          if (inputActions.insertText(`\n\n${pending}`, span)) return;
+          if (inputActions.insertText(`\n\n${text}`, span)) return;
           if (attempt < 5) {
-            timer = window.setTimeout(() => place(attempt + 1), 80);
+            timer = window.setTimeout(() => insertWithRetry(text, allowReplace, attempt + 1), 80);
             return;
           }
-          inputActions.setDraft(`${draft.trimEnd()}\n\n${pending}`);
+          if (allowReplace) inputActions.setDraft(`${draft.trimEnd()}\n\n${text}`);
         };
-        place(0);
+        insertWithRetry(pending.text, true);
+        const attach = async () => {
+          if (pending.attachments.length === 0) return;
+          const result = await attachConversationFiles({
+            attachments: pending.attachments,
+            sessionId,
+            sessions,
+            inputActions,
+            readFile: fetchScratchpadBlob,
+          });
+          if (cancelled || result.failed.length === 0) return;
+          // The composer could not take the files; leave their names in the draft
+          // so the Agent still knows what the note carried.
+          insertWithRetry(`${t('note.attachments')}: ${result.failed.map((attachment) => attachment.name).join(', ')}`, false);
+        };
+        void attach();
         return () => {
           cancelled = true;
           window.clearTimeout(timer);
         };
-      }, [draft, inputActions]);
+      }, [draft, inputActions, sessionId, sessions, t]);
       return null;
     }
 
@@ -1394,9 +1463,14 @@ window.__ModuleLoader__.load({
 
       const sendToChat = useCallback((note) => {
         if (!note || (note.text.trim() === '' && note.attachments.length === 0)) return;
-        queueComposerText(conversationMessageOf(note, t));
+        const text = note.text.trim() === '' ? '' : note.text;
+        queueComposerText(text, note.attachments.map((attachment) => ({
+          id: attachment.id,
+          name: attachment.name,
+          type: attachment.type,
+        })));
         sendToConversation();
-      }, [sendToConversation, t]);
+      }, [sendToConversation]);
 
       const importBackup = useCallback(async (fileList) => {
         const file = fileList && fileList[0];
@@ -1709,6 +1783,7 @@ window.__ModuleLoader__.load({
           name: 'conversation.input.left',
           id: 'scratchpad-composer-bridge',
           order: 1000,
+          inject: () => ({ sessions: ctx.get('sessions'), t }),
         }, ComposerHandoffBridge));
 
         // In-app wake-up shortcut. Registration is optional: a host without the
