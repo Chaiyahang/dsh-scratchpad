@@ -1,8 +1,13 @@
 # 便签 · DSH Scratchpad
 
+[![test](https://github.com/Chaiyahang/dsh-scratchpad/actions/workflows/test.yml/badge.svg)](https://github.com/Chaiyahang/dsh-scratchpad/actions/workflows/test.yml)
+[![npm](https://img.shields.io/npm/v/@chaiyahang/dsh-scratchpad)](https://www.npmjs.com/package/@chaiyahang/dsh-scratchpad)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 给 DeepSeek Harness 的左栏便签插件：随手记、边写边存，Agent 也能读写。
 
-> 状态：`0.1.0`（首个公开版本，beta）。功能完整，仍建议先在个人 profile 中使用并反馈问题。
+> 状态：`0.2.0`（beta）。功能完整，建议先在个人 profile 中使用并反馈问题。
+> 要求：DSH `>=0.2.1-rc.2`（`dsh.engines.dsh`）。
 
 ## 功能
 
@@ -18,7 +23,13 @@
 
 ## 安装
 
-从 GitHub 安装（尚未发布 npm）：
+从 npm 安装：
+
+```bash
+dsh plugin --profile <profile> add @chaiyahang/dsh-scratchpad
+```
+
+或直接从 GitHub 安装（跟随默认分支）：
 
 ```bash
 dsh plugin --profile <profile> add github:Chaiyahang/dsh-scratchpad
@@ -30,7 +41,7 @@ dsh plugin --profile <profile> add github:Chaiyahang/dsh-scratchpad
 plugin_manager install_bundle /绝对路径/到/dsh-scratchpad
 ```
 
-安装后刷新页面即可。发布 npm 之后可改为包名安装。
+安装后刷新页面即可。升级同理，重装后刷新。
 
 ## 使用
 
@@ -77,7 +88,13 @@ node --check client.js
 npm test
 ```
 
-测试覆盖：Handler 行为（CRUD/附件/导入导出/标签）、路由注册与热重载容错、Markdown 渲染。
+测试覆盖 5 个文件：Handler 行为（CRUD/附件/导入导出/标签）、路由注册与热重载容错、附件转移（成功/锁定回滚/缺失/无服务）、Markdown 渲染、面板版本与 `package.json` 一致性。
+
+## 链接
+
+- 仓库：https://github.com/Chaiyahang/dsh-scratchpad
+- 发布：https://github.com/Chaiyahang/dsh-scratchpad/releases
+- 问题：https://github.com/Chaiyahang/dsh-scratchpad/issues
 
 ```
 index.js          Host：存储、HTTP 路由、Agent 工具
