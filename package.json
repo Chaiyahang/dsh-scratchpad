@@ -46,5 +46,13 @@
         "@deepseek-ai/dsh-client-locale"
       ]
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Chaiyahang/dsh-scratchpad.git"
+  },
+  "homepage": "https://github.com/Chaiyahang/dsh-scratchpad#readme",
+  "bugs": {
+    "url": "https://github.com/Chaiyahang/dsh-scratchpad/issues"
   }
 }
