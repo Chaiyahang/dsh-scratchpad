@@ -2,6 +2,7 @@
 
 [![test](https://github.com/Chaiyahang/dsh-scratchpad/actions/workflows/test.yml/badge.svg)](https://github.com/Chaiyahang/dsh-scratchpad/actions/workflows/test.yml)
 [![npm](https://img.shields.io/npm/v/@chaiyahang/dsh-scratchpad)](https://www.npmjs.com/package/@chaiyahang/dsh-scratchpad)
+[![npm downloads](https://img.shields.io/npm/dt/@chaiyahang/dsh-scratchpad)](https://www.npmjs.com/package/@chaiyahang/dsh-scratchpad)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 给 DeepSeek Harness 的左栏便签插件：随手记、边写边存，Agent 也能读写。
