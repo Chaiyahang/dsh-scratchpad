@@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
     /** Locale namespace and the `main` key / sidebar id share one identifier. */
     const NS = 'scratchpad';
     /** Keep in sync with package.json; tests/version.test.mjs guards the pair. */
-    const VERSION = '0.2.3';
+    const VERSION = '0.2.4';
     const PANEL_ID = 'scratchpad';
     const PANEL_ORDER = 24;
     const STYLE_ID = '@chaiyahang/dsh-scratchpad/panel.css';
