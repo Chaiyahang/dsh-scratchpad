@@ -5,7 +5,8 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: read
+  # contents: write 是创建 GitHub Release 所需
+  contents: write
   id-token: write
 
 jobs:
@@ -30,3 +31,20 @@ jobs:
       - run: node --check client.js
       - run: npm test
       - run: npm publish --access public --provenance
+      - name: Create GitHub release from CHANGELOG
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes=$(mktemp)
+          awk -v ver="$version" '
+            index($0, "## " ver " ") == 1 || $0 == "## " ver { ok = 1; next }
+            ok && /^## / { exit }
+            ok { print }
+          ' CHANGELOG.md > "$notes"
+          test -s "$notes" || { echo "CHANGELOG has no section for $version" >&2; exit 1; }
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$notes"
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$notes"
+          fi

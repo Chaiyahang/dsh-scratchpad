@@ -75,7 +75,7 @@ node --check index.js && node --check client.js
 npm test
 ```
 
-打 `v*` tag 推送后，`.github/workflows/publish.yml` 通过 npm Trusted Publishing（OIDC）自动发布；首次启用需在 npm 包设置登记仓库与工作流，并设置仓库变量 `NPM_TRUSTED_PUBLISHING=true`。
+打 `v*` tag 推送后，`.github/workflows/publish.yml` 通过 npm Trusted Publishing（OIDC）自动发布，并以 CHANGELOG 对应版本段落为 notes 创建 GitHub Release；首次启用需在 npm 包设置登记仓库与工作流，并设置仓库变量 `NPM_TRUSTED_PUBLISHING=true`。
 
 ## 链接
 
