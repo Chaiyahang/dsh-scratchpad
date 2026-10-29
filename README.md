@@ -82,6 +82,6 @@ npm test
 - 仓库：https://github.com/Chaiyahang/dsh-scratchpad
 - 发布：https://github.com/Chaiyahang/dsh-scratchpad/releases
 - 问题：https://github.com/Chaiyahang/dsh-scratchpad/issues
-- 市场：等待 [dshopen 收录](https://github.com/polang233/dsh-plugin-index/issues/73)
+- 市场：已收录于 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)（[收录 PR](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/9722)）和 [dshopen](https://github.com/polang233/dsh-plugin-index/issues/73)
 
 MIT
