@@ -42,6 +42,7 @@ window.__ModuleLoader__.load({
         'panel.draftRestored': 'Restored an unsaved draft.',
         'panel.deleted': 'Note deleted — kept for 7 days.',
         'panel.undo': 'Undo',
+        'panel.updatedElsewhere': 'This note was just updated in another window or by the Agent.',
         'editor.placeholder': 'Jot an idea down…',
         'editor.image': 'Image',
         'editor.file': 'File',
@@ -96,6 +97,7 @@ window.__ModuleLoader__.load({
         'panel.draftRestored': '已恢复上次未保存的草稿。',
         'panel.deleted': '便签已删除，7 天内可恢复。',
         'panel.undo': '撤销',
+        'panel.updatedElsewhere': '此便签刚被其他窗口或 Agent 更新。',
         'editor.placeholder': '随手记点什么…',
         'editor.image': '图片',
         'editor.file': '文件',
@@ -801,10 +803,13 @@ window.__ModuleLoader__.load({
       const date = new Date(ts);
       const now = new Date();
       const pad = (value) => String(value).padStart(2, '0');
-      const clock = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      const clock = [pad(date.getHours()), pad(date.getMinutes())].join(':');
+      const day = [pad(date.getMonth() + 1), pad(date.getDate())].join('-');
+      if (date.getFullYear() !== now.getFullYear()) {
+        return [date.getFullYear(), day].join('-') + ' ' + clock;
+      }
       const sameDay = date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
-      if (sameDay) return clock;
-      return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${clock}`;
+      return sameDay ? clock : day + ' ' + clock;
     }
 
     function extensionOf(name) {
@@ -1285,9 +1290,11 @@ window.__ModuleLoader__.load({
             }
             if (fresh.updatedAt !== current.updatedAt || fresh.text !== current.text || fresh.pinned !== current.pinned
               || fresh.attachments.length !== current.attachments.length) {
+              const contentChanged = fresh.text !== current.text || fresh.attachments.length !== current.attachments.length;
               updateEditor(copyOf(fresh));
               baseRef.current = fresh.updatedAt;
               setSaveState('saved');
+              if (contentChanged) setNotice(t('panel.updatedElsewhere'));
             }
           } catch {} finally {
             busy = false;
