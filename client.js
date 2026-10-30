@@ -69,6 +69,7 @@ window.__ModuleLoader__.load({
         'editor.emptyPreview': 'Nothing to preview yet.',
         'editor.task': 'Task',
         'shortcut.open': 'Open scratchpad',
+        'shortcut.new': 'New note',
         'data.export': 'Export',
         'data.exportHint': 'Download every note, attachments included, as one JSON file.',
         'data.import': 'Import',
@@ -124,6 +125,7 @@ window.__ModuleLoader__.load({
         'editor.emptyPreview': '还没有内容可预览。',
         'editor.task': '待办',
         'shortcut.open': '打开便签',
+        'shortcut.new': '新建便签',
         'data.export': '导出',
         'data.exportHint': '把全部便签（含附件）导出为一个 JSON 文件。',
         'data.import': '导入',
@@ -402,6 +404,18 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /**
+     * Open an http(s) URL outside the panel. Webviews differ in how they route
+     * new windows, so every link click goes through window.open explicitly
+     * instead of relying on default anchor navigation.
+     */
+    function openExternal(url) {
+      if (!/^https?:\/\//i.test(url)) return;
+      try {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } catch {}
+    }
+
     // ---------------------------------------------------------------------
     // Lightweight Markdown rendering (no dependencies, no raw HTML)
     // ---------------------------------------------------------------------
@@ -416,7 +430,7 @@ window.__ModuleLoader__.load({
       let match;
       const pushLink = (linkUrl, label) => {
         index += 1;
-        nodes.push(h('a', { key: index, className: 'dsh-sp__mdLink', href: linkUrl, target: '_blank', rel: 'noopener noreferrer' }, label));
+        nodes.push(h('a', { key: index, className: 'dsh-sp__mdLink', href: linkUrl, target: '_blank', rel: 'noopener noreferrer', onClick: (event) => { event.preventDefault(); event.stopPropagation(); openExternal(linkUrl); } }, label));
       };
       while ((match = pattern.exec(source)) !== null) {
         if (match.index > cursor) nodes.push(source.slice(cursor, match.index));
@@ -641,6 +655,30 @@ window.__ModuleLoader__.load({
       return () => scratchpadFocusListeners.delete(listener);
     }
 
+    /** Set when the new-note shortcut fires; consumed by the mounted panel. */
+    let scratchpadNewPending = false;
+    const scratchpadNewListeners = new Set();
+
+    function markScratchpadNew() {
+      scratchpadNewPending = true;
+      for (const listener of [...scratchpadNewListeners]) {
+        try {
+          listener();
+        } catch {}
+      }
+    }
+
+    function takeScratchpadNew() {
+      if (!scratchpadNewPending) return false;
+      scratchpadNewPending = false;
+      return true;
+    }
+
+    function onScratchpadNewRequest(listener) {
+      scratchpadNewListeners.add(listener);
+      return () => scratchpadNewListeners.delete(listener);
+    }
+
     function isMacPlatform() {
       try {
         return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
@@ -654,18 +692,24 @@ window.__ModuleLoader__.load({
      * every declared default against the reserved/conflicting tables, so a later
      * candidate is tried only when an earlier one is rejected by this host.
      */
-    function shortcutCandidates(t, onRun) {
+    const OPEN_SHORTCUTS = [
+      { id: 'scratchpad.open', labelKey: 'shortcut.open', code: 'KeyS', modifiers: ['primary', 'shift'], mac: '⌘⇧S', other: 'Ctrl+Shift+S', web: true, titleHint: true },
+      { id: 'scratchpad.open.alt-s', labelKey: 'shortcut.open', code: 'KeyS', modifiers: ['primary', 'alt'], mac: '⌘⌥S', other: 'Ctrl+Alt+S', web: false },
+      { id: 'scratchpad.open.alt-n', labelKey: 'shortcut.open', code: 'KeyN', modifiers: ['primary', 'alt'], mac: '⌘⌥N', other: 'Ctrl+Alt+N', web: false },
+    ];
+    const NEW_SHORTCUTS = [
+      { id: 'scratchpad.new', labelKey: 'shortcut.new', code: 'KeyN', modifiers: ['primary', 'shift'], mac: '⌘⇧N', other: 'Ctrl+Shift+N', web: false },
+      { id: 'scratchpad.new.alt-s', labelKey: 'shortcut.new', code: 'KeyS', modifiers: ['primary', 'alt', 'shift'], mac: '⌘⌥⇧S', other: 'Ctrl+Alt+Shift+S', web: false },
+    ];
+
+    function shortcutCandidates(variants, t, onRun) {
       const mac = isMacPlatform();
-      const variants = [
-        { id: 'scratchpad.open', code: 'KeyS', modifiers: ['primary', 'shift'], mac: '⌘⇧S', other: 'Ctrl+Shift+S', web: true },
-        { id: 'scratchpad.open.alt-s', code: 'KeyS', modifiers: ['primary', 'alt'], mac: '⌘⌥S', other: 'Ctrl+Alt+S', web: false },
-        { id: 'scratchpad.open.alt-n', code: 'KeyN', modifiers: ['primary', 'alt'], mac: '⌘⌥N', other: 'Ctrl+Alt+N', web: false },
-      ];
       return variants.map((variant) => ({
         hint: mac ? variant.mac : variant.other,
+        titleHint: variant.titleHint === true,
         definition: {
           id: variant.id,
-          label: () => t('shortcut.open'),
+          label: () => t(variant.labelKey),
           aliases: ['scratchpad', 'notes', '便签', '随手记'],
           defaults: {
             'desktop:macos': { code: variant.code, modifiers: variant.modifiers },
@@ -1078,16 +1122,23 @@ window.__ModuleLoader__.load({
               title: t('note.delete'),
               onClick: () => onRequestDelete(note),
             }, confirming ? t('note.confirmDelete') : h(TrashIcon, null)))),
-        h('button', {
-          type: 'button',
+        h('span', {
           className: 'dsh-sp__noteOpen',
+          role: 'button',
+          tabIndex: 0,
           'aria-label': t('note.open'),
           onClick: () => onOpen(note),
+          onKeyDown: (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onOpen(note);
+            }
+          },
         },
         h('span', {
           className: 'dsh-sp__noteText',
           'data-empty': preview ? 'false' : 'true',
-        }, preview || t('note.untitled')),
+        }, preview ? renderInline(preview) : t('note.untitled')),
         note.attachments.length > 0 ? h('span', { className: 'dsh-sp__noteAttach' },
           note.attachments.map((attachment) => h(NoteThumb, { key: attachment.id, attachment }))) : null,
         note.tags.length > 0 ? h('span', { className: 'dsh-sp__noteTags' },
@@ -1452,6 +1503,15 @@ window.__ModuleLoader__.load({
         window.setTimeout(() => textareaRef.current?.focus(), 0);
       }, [flush, updateEditor]);
 
+      // New-note shortcut: consumed here when mounted, or once the panel mounts.
+      useEffect(() => {
+        const off = onScratchpadNewRequest(() => {
+          if (takeScratchpadNew()) void startDraft();
+        });
+        if (takeScratchpadNew()) void startDraft();
+        return off;
+      }, [startDraft]);
+
       const openNote = useCallback(async (note) => {
         if (editorRef.current.id === note.id) {
           textareaRef.current?.focus();
@@ -1623,6 +1683,17 @@ window.__ModuleLoader__.load({
         }
       }, [startDraft]);
 
+      /** ⌘/Ctrl-click opens the URL under the caret without leaving edit mode. */
+      const onEditorClick = useCallback((event) => {
+        if (!(event.metaKey || event.ctrlKey)) return;
+        const area = event.currentTarget;
+        const caret = typeof area.selectionStart === 'number' ? area.selectionStart : 0;
+        const before = /(\S+)$/.exec(area.value.slice(0, caret));
+        const after = /^(\S+)/.exec(area.value.slice(caret));
+        const token = (before ? before[1] : '') + (after ? after[1] : '');
+        if (/^https?:\/\//i.test(token)) openExternal(token.replace(/[.,;:!?]+$/, ''));
+      }, []);
+
       const sendToChat = useCallback((note) => {
         if (!note || (note.text.trim() === '' && note.attachments.length === 0)) return;
         const text = note.text.trim() === '' ? '' : note.text;
@@ -1741,6 +1812,7 @@ window.__ModuleLoader__.load({
               spellCheck: false,
               onChange: onTextChange,
               onPaste,
+              onClick: onEditorClick,
               onKeyDown: onEditorKeyDown,
               onBlur: () => { void flush(); },
             }),
@@ -1964,30 +2036,44 @@ window.__ModuleLoader__.load({
           inject: () => ({ sessions: ctx.get('sessions'), getSessions: () => ctx.get('sessions'), t }),
         }, ComposerHandoffBridge));
 
-        // In-app wake-up shortcut. Registration is optional: a host without the
-        // shortcuts service simply has no binding and the panel still works.
+        // In-app shortcuts. Registration is optional: a host without the
+        // shortcuts service simply has no bindings and the panel still works.
         ctx.inject(['shortcuts'], (scoped) => {
           try {
             const shortcuts = scoped.get('shortcuts');
             if (!shortcuts || typeof shortcuts.register !== 'function') return;
             scoped.effect(() => {
-              const open = () => {
+              const openPanel = () => {
                 markScratchpadFocus();
                 ctx.layout.selectPanel(PANEL_ID);
               };
-              for (const candidate of shortcutCandidates(t, open)) {
+              const startNew = () => {
+                markScratchpadNew();
+                ctx.layout.selectPanel(PANEL_ID);
+              };
+              const candidates = [
+                ...shortcutCandidates(OPEN_SHORTCUTS, t, openPanel),
+                ...shortcutCandidates(NEW_SHORTCUTS, t, startNew),
+              ];
+              const disposers = [];
+              for (const candidate of candidates) {
                 try {
-                  const dispose = shortcuts.register(candidate.definition);
-                  activeShortcutHint = candidate.hint;
-                  return dispose;
+                  disposers.push(shortcuts.register(candidate.definition));
+                  if (candidate.titleHint) activeShortcutHint = candidate.hint;
                 } catch (error) {
-                  scoped.logger?.warn?.(`scratchpad: shortcut ${candidate.definition.id} unavailable: ${error instanceof Error ? error.message : String(error)}`);
+                  scoped.logger?.warn?.('scratchpad: shortcut ' + candidate.definition.id + ' unavailable: ' + (error instanceof Error ? error.message : String(error)));
                 }
               }
-              return undefined;
-            }, 'scratchpad: open shortcut');
+              return () => {
+                for (const dispose of disposers) {
+                  try {
+                    dispose();
+                  } catch {}
+                }
+              };
+            }, 'scratchpad: shortcuts');
           } catch (error) {
-            scoped.logger?.warn?.(`scratchpad: shortcut registration failed: ${error instanceof Error ? error.message : String(error)}`);
+            scoped.logger?.warn?.('scratchpad: shortcut registration failed: ' + (error instanceof Error ? error.message : String(error)));
           }
         });
       },
