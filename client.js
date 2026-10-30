@@ -169,6 +169,8 @@ window.__ModuleLoader__.load({
 .dsh-sp__mdTaskText[data-done="true"]{color:var(--dsw-alias-label-secondary);text-decoration:line-through}
 .dsh-sp__mdPre{margin:0 0 8px;padding:8px 10px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;overflow-x:auto;font-size:12px;line-height:1.55}
 .dsh-sp__mdCode{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--dsw-alias-bg-layer-2);border-radius:4px;padding:0 4px}
+.dsh-sp__mdLink{color:var(--dsw-alias-brand-primary);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
+.dsh-sp__mdLink:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .dsh-sp__mdQuote{margin:0 0 6px;padding-left:10px;border-left:2px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary)}
 .dsh-sp__tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:24px}
 .dsh-sp__tag{display:inline-flex;align-items:center;gap:3px;max-width:180px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);border-radius:999px;padding:1px 6px;font-size:11px;line-height:1.6}
@@ -399,11 +401,15 @@ window.__ModuleLoader__.load({
     /** Inline spans: code, bold, italic. Text stays plain React children. */
     function renderInline(text) {
       const source = String(text);
-      const pattern = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\*[^*\n]+\*)/g;
+      const pattern = /(`[^`\n]+`|\*\*[^*\n]+\*\*|~~[^~\n]+~~|\*[^*\n]+\*|\[[^\]\n]+\]\([^)\s]+\)|https?:[/][/][^\s<>()\u0022\u0027\u201c\u201d\u2018\u2019\u2026\u2014\u3000-\u303f\uff00-\uffef\u4e00-\u9fff]+)/g;
       const nodes = [];
       let cursor = 0;
       let index = 0;
       let match;
+      const pushLink = (linkUrl, label) => {
+        index += 1;
+        nodes.push(h('a', { key: index, className: 'dsh-sp__mdLink', href: linkUrl, target: '_blank', rel: 'noopener noreferrer' }, label));
+      };
       while ((match = pattern.exec(source)) !== null) {
         if (match.index > cursor) nodes.push(source.slice(cursor, match.index));
         const token = match[0];
@@ -411,8 +417,23 @@ window.__ModuleLoader__.load({
           nodes.push(h('code', { key: `c${index++}`, className: 'dsh-sp__mdCode' }, token.slice(1, -1)));
         } else if (token.startsWith('**')) {
           nodes.push(h('strong', { key: `b${index++}` }, token.slice(2, -2)));
-        } else {
+        } else if (token.startsWith('~~')) {
+          nodes.push(h('del', { key: `s${index++}` }, token.slice(2, -2)));
+        } else if (token.startsWith('*')) {
           nodes.push(h('em', { key: `e${index++}` }, token.slice(1, -1)));
+        } else if (token.startsWith('[')) {
+          const link = /^\[([^\]\n]+)\]\(([^)\s]+)\)$/.exec(token);
+          // Only http(s)/mailto targets become anchors; anything else stays
+          // literal text so a crafted note can never script the panel.
+          if (link !== null && /^(https?:[/][/]|mailto:)/i.test(link[2])) {
+            pushLink(link[2], renderInline(link[1]));
+          } else {
+            nodes.push(token);
+          }
+        } else {
+          const url = token.replace(/[.,;:!?]+$/, '');
+          pushLink(url, url);
+          if (url.length < token.length) nodes.push(token.slice(url.length));
         }
         cursor = match.index + token.length;
       }

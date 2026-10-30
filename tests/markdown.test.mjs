@@ -65,4 +65,18 @@ assert(excerpt('- [x] done\n- [ ] open\n## Head') === '☑ done\n☐ open\nHead'
 const inline = flatten(renderInline('a **b** `c` *d* e'));
 assert(inline.join('|') === 'a |strong|b| |code|c| |em|d| e', 'inline tokens map to elements');
 
+const bare = renderInline('看 https://example.com/a。 next').find((node) => node.type === 'a');
+assert(bare && bare.props.href === 'https://example.com/a', 'a bare URL becomes a link without trailing punctuation');
+assert(bare.props.rel === 'noopener noreferrer', 'links carry rel=noopener');
+assert(renderInline('https://example.com/a。 next').at(-1) === '。 next', 'trailing punctuation stays text');
+const cjk = renderInline('看 https://example.com/a，然后').find((node) => node.type === 'a');
+assert(cjk && cjk.props.href === 'https://example.com/a', 'full-width punctuation ends a bare URL');
+
+const labelled = renderInline('[label](https://example.com/x?y=1)').find((node) => node.type === 'a');
+assert(labelled && labelled.props.href === 'https://example.com/x?y=1' && flatten([labelled]).includes('label'),
+  'markdown links render with their label');
+const hostile = renderInline('[x](javascript:alert(1)) [y](/relative) z');
+assert(!hostile.some((node) => node.type === 'a'), 'non-http(s)/mailto targets stay literal text');
+assert(renderInline('~~gone~~ kept').some((node) => node.type === 'del'), 'strikethrough renders');
+
 console.log('markdown test passed');
