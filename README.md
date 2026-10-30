@@ -7,7 +7,7 @@
 
 给 DeepSeek Harness 的左栏便签插件：随手记、边写边存，Agent 也能读写。
 
-Beta。要求 DSH `>=0.2.1-rc.2`；版本变化见 [CHANGELOG](CHANGELOG.md)。
+要求 DSH `>=0.2.1-rc.2`；版本变化见 [CHANGELOG](CHANGELOG.md)。
 
 ## 功能
 
