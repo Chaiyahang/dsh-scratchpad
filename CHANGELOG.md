@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- 附件服务加固：仅位图格式（png/jpeg/gif/webp/avif/bmp/ico）以 inline 预览，SVG/HTML 等其余类型一律以 `application/octet-stream` + 下载响应；所有附件响应统一带 `Content-Security-Policy: sandbox`，恶意上传或导入的文件无法在应用 origin 内执行脚本
+
+### Fixed
+
+- `notes.json` 损坏自愈：每次写入前把当前文件轮转为 `notes.json.bak`；文件损坏时自动留档为 `notes.json.corrupt-*` 并从备份恢复，不再导致面板持续报错；无可用备份时以空库启动，坏文件保留待手工恢复
+
+### Changed
+
+- 列表与编辑器中的图片缩略图懒加载（`loading="lazy"`），多图便签不再一次性拉取全部原图
+
 ## 0.2.4 — 2026-10-27
 
 ### Changed

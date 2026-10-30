@@ -63,6 +63,8 @@ dsh plugin --profile PROFILE add github:Chaiyahang/dsh-scratchpad
 ## 数据与限制
 
 - 数据在 `~/.dsh/scratchpad/`（`notes.json` + `files/`），不经过外部网络；卸载不清除
+- 每次写入前自动轮转 `notes.json.bak`；文件损坏时自动留档为 `notes.json.corrupt-*` 并从备份恢复
+- 图片直接预览；其他附件一律下载，不在浏览器内打开
 - 附件是真实文件，Agent 读取时拿到绝对路径；Markdown 渲染不执行 HTML
 - UI 与 Agent 同时修改同一条便签为最后写入优先
 - 导入只有合并模式；数据仅本机，不跨设备同步

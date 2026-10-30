@@ -878,7 +878,7 @@ window.__ModuleLoader__.load({
           className: 'dsh-sp__tileOpen',
           title: label,
           onClick: () => onOpen(attachment),
-        }, h('img', { className: 'dsh-sp__tileImg', src: attachmentUrl(attachment.id), alt: '' }))
+        }, h('img', { className: 'dsh-sp__tileImg', src: attachmentUrl(attachment.id), alt: '', loading: 'lazy', decoding: 'async' }))
         : h('a', {
           className: 'dsh-sp__tileOpen',
           href: attachmentUrl(attachment.id, true),
@@ -899,7 +899,7 @@ window.__ModuleLoader__.load({
     function NoteThumb({ attachment }) {
       if (attachment.kind === 'image') {
         return h('span', { className: 'dsh-sp__thumb', title: attachment.name },
-          h('img', { className: 'dsh-sp__thumbImg', src: attachmentUrl(attachment.id), alt: '' }));
+          h('img', { className: 'dsh-sp__thumbImg', src: attachmentUrl(attachment.id), alt: '', loading: 'lazy', decoding: 'async' }));
       }
       return h('span', { className: 'dsh-sp__thumb', title: `${attachment.name} (${formatSize(attachment.size)})` }, extensionOf(attachment.name));
     }
