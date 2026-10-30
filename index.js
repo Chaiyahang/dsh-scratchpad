@@ -23,6 +23,8 @@ const MAX_TAGS = 12;
 const MAX_TAG_LENGTH = 32;
 /** Types a browser renders without executing anything; every other served file downloads. */
 const INLINE_IMAGE_TYPES = /^image\/(?:avif|bmp|gif|jpeg|jpg|png|webp|x-icon|vnd\.microsoft\.icon)$/;
+/** How long a soft-deleted note (and its attachment files) stays recoverable. */
+const DELETE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** A request-level failure with the HTTP status the channel should report. */
 class HttpError extends Error {
@@ -180,7 +182,7 @@ export function apply(ctx) {
 
   async function handleList() {
     const state = await readState();
-    return json({ ok: true, revision: state.revision, notes: state.notes });
+    return json({ ok: true, revision: state.revision, notes: state.notes.filter((note) => !note.deletedAt) });
   }
 
   async function handleSave(request) {
@@ -223,14 +225,33 @@ export function apply(ctx) {
     const body = await readBody(request);
     const id = typeof body?.id === 'string' ? body.id : '';
     if (!id) throw badRequest('missing note id');
-    const attachments = await mutate((state) => {
+    await mutate((state) => {
       const index = state.notes.findIndex((item) => item.id === id);
-      if (index < 0) return [];
-      const [note] = state.notes.splice(index, 1);
-      return note.attachments;
+      if (index < 0 || state.notes[index].deletedAt) return false;
+      // Soft delete: the note and the files behind its attachments stay on
+      // disk for the retention window so a delete can be undone.
+      state.notes[index] = { ...state.notes[index], deletedAt: Date.now() };
     });
-    await removeFiles(attachments);
     return json({ ok: true });
+  }
+
+  /** Permanently drop notes whose soft-delete grace period has elapsed. */
+  async function purgeExpired() {
+    const state = await readState();
+    const cutoff = Date.now() - DELETE_RETENTION_MS;
+    if (!state.notes.some((note) => note.deletedAt && note.deletedAt <= cutoff)) return;
+    const expired = await mutate((current) => {
+      const removed = [];
+      const kept = [];
+      for (const note of current.notes) {
+        if (note.deletedAt && note.deletedAt <= cutoff) removed.push(note);
+        else kept.push(note);
+      }
+      if (removed.length === 0) return false;
+      current.notes = kept;
+      return removed.flatMap((note) => note.attachments);
+    });
+    if (expired !== false) await removeFiles(expired);
   }
 
   async function handleUpload(request) {
@@ -260,6 +281,7 @@ export function apply(ctx) {
     const state = await readState();
     const notes = [];
     for (const note of state.notes) {
+      if (note.deletedAt) continue;
       const attachments = [];
       for (const attachment of note.attachments) {
         const entry = {
@@ -347,7 +369,10 @@ export function apply(ctx) {
           updatedAt: raw.updatedAt,
           attachments,
         });
-        if (note !== null) stagedNotes.push(note);
+        if (note !== null) {
+          note.deletedAt = 0;
+          stagedNotes.push(note);
+        }
       }
     } catch (error) {
       await removeFiles(stagedFiles);
@@ -477,7 +502,7 @@ export function apply(ctx) {
   }
 
   function findNote(state, id) {
-    return state.notes.find((item) => item.id === id);
+    return state.notes.find((item) => item.id === id && !item.deletedAt);
   }
 
   const tools = [
@@ -642,7 +667,7 @@ export function apply(ctx) {
     },
     {
       name: 'scratchpad_delete',
-      description: 'Delete a Scratchpad note and its stored attachments. Use it only when the user explicitly asks to remove or forget a note; the deletion is permanent.',
+      description: 'Hide a Scratchpad note from the panel. Use it only when the user explicitly asks to remove or forget a note. The note stays recoverable by the user for 7 days, then it and its attachments are purged for good.',
       parameters: {
         type: 'object',
         additionalProperties: false,
@@ -658,13 +683,11 @@ export function apply(ctx) {
         const state = await readState();
         const note = findNote(state, id);
         if (!note) return `No scratchpad note with id "${id}". Nothing was deleted.`;
-        const attachments = await mutate((current) => {
+        await mutate((current) => {
           const index = current.notes.findIndex((item) => item.id === id);
-          if (index < 0) return [];
-          const [removed] = current.notes.splice(index, 1);
-          return removed.attachments;
+          if (index < 0 || current.notes[index].deletedAt) return false;
+          current.notes[index] = { ...current.notes[index], deletedAt: Date.now() };
         });
-        await removeFiles(attachments);
         return `Deleted scratchpad note ${id}.`;
       },
     },
@@ -675,8 +698,14 @@ export function apply(ctx) {
   // -------------------------------------------------------------------
 
   ctx.effect(() => {
-    void load().catch((error) => ctx.logger?.warn?.(`scratchpad: could not load notes: ${String(error)}`));
-  }, 'scratchpad: warm the note store');
+    void load().catch((error) => ctx.logger?.warn?.('scratchpad: could not load notes:', error instanceof Error ? error.message : String(error)));
+    const sweep = () => {
+      void purgeExpired().catch((error) => ctx.logger?.warn?.('scratchpad: purge sweep failed:', error instanceof Error ? error.message : String(error)));
+    };
+    sweep();
+    const sweeper = setInterval(sweep, 60 * 60 * 1000);
+    return () => clearInterval(sweeper);
+  }, 'scratchpad: warm the note store and sweep expired deletes');
 
   ctx.inject(['connection'], (scoped) => {
     try {
@@ -831,6 +860,7 @@ function readNote(input) {
     pinned: input.pinned === true,
     createdAt: toTime(input.createdAt),
     updatedAt: toTime(input.updatedAt),
+    deletedAt: Number.isFinite(input.deletedAt) && input.deletedAt > 0 ? Math.round(input.deletedAt) : 0,
     attachments,
   };
 }
@@ -839,5 +869,7 @@ function readNote(input) {
 function writeNote(input) {
   const note = readNote(input);
   if (note === null) throw new HttpError(400, 'note is malformed');
+  // Client saves are always live; only the delete routes soft-delete.
+  note.deletedAt = 0;
   return note;
 }

@@ -102,7 +102,7 @@ try {
   for (const id of ['note-a', 'tags-case', 'tags-cap', taggedId]) {
     await harness.request('POST', '/api/scratchpad/notes/delete', { json: { id } });
   }
-  assert((await readdir(join(harness.dir, 'scratchpad', 'files'))).length === 0, 'deleting notes removes attachment files');
+  assert((await readdir(join(harness.dir, 'scratchpad', 'files'))).length === 1, 'a soft-deleted note keeps its attachment files for the grace period');
 
   result = await harness.request('POST', '/api/scratchpad/import', { json: { document: full.body } });
   assert(result.status === 200 && result.body.imported === full.body.notes.length, 'imports a full backup');
@@ -156,6 +156,24 @@ try {
   assert(result.status === 200 && result.body.note.text === 'v4', 'saving against the current base succeeds');
   result = await harness.request('POST', '/api/scratchpad/notes', { json: { note: staleNote(50, 'v5') } });
   assert(result.status === 200 && result.body.note.text === 'v5', 'a save without a base stays unconditional');
+
+  // Soft delete: the note leaves the panel and tools immediately, its files
+  // stay on disk for the grace period, and a matching re-save restores it.
+  const trashUpload = await harness.request('POST', FILES, { bytes: Buffer.from([3, 4]), query: { name: 't.bin', type: 'application/octet-stream' } });
+  const trashNote = { id: 'trash-me', text: '回收站测试', createdAt: 1, updatedAt: 10, attachments: [trashUpload.body.attachment] };
+  await harness.request('POST', '/api/scratchpad/notes', { json: { note: trashNote } });
+  result = await harness.request('POST', '/api/scratchpad/notes/delete', { json: { id: 'trash-me' } });
+  assert(result.status === 200, 'deleting a note answers ok');
+  state = await harness.request('GET', '/api/scratchpad/notes');
+  assert(!state.body.notes.some((item) => item.id === 'trash-me'), 'a deleted note leaves the list');
+  output = await harness.runTool('scratchpad_read', { id: 'trash-me' });
+  assert(output.includes('No scratchpad note'), 'tools no longer see a deleted note');
+  result = await harness.request('GET', FILES, { query: { id: trashUpload.body.attachment.id } });
+  assert(result.status === 200, 'the attachment file survives the grace period');
+  result = await harness.request('POST', '/api/scratchpad/notes', { json: { note: trashNote } });
+  assert(result.status === 200 && result.body.note.deletedAt === 0, 're-saving restores the deleted note (undo)');
+  state = await harness.request('GET', '/api/scratchpad/notes');
+  assert(state.body.notes.some((item) => item.id === 'trash-me'), 'the restored note is back in the list');
 
   console.log('notes test passed');
 } finally {

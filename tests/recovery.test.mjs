@@ -65,3 +65,34 @@ try {
 } finally {
   await fresh.cleanup();
 }
+
+// Expired soft-deletes are purged (note and attachment files) when the store loads.
+const sweeper = await createHarness();
+try {
+  const dir = join(sweeper.dir, 'scratchpad');
+  await mkdir(join(dir, 'files'), { recursive: true });
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  const store = {
+    version: 1,
+    revision: 5,
+    notes: [
+      { id: 'live', text: 'keep', tags: [], pinned: false, createdAt: 1, updatedAt: 2, deletedAt: 0, attachments: [] },
+      { id: 'fresh', text: 'recent trash', tags: [], pinned: false, createdAt: 1, updatedAt: 2, deletedAt: now - day, attachments: [] },
+      { id: 'expired', text: 'old trash', tags: [], pinned: false, createdAt: 1, updatedAt: 2, deletedAt: now - 8 * day, attachments: [{ id: 'att-old', name: 'old.png', type: 'image/png', size: 2, kind: 'image', storedName: 'att-old.png' }] },
+    ],
+  };
+  await writeFile(join(dir, 'notes.json'), JSON.stringify(store), 'utf8');
+  await writeFile(join(dir, 'files', 'att-old.png'), Buffer.from([9, 9]));
+  sweeper.reload();
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  const list = await sweeper.request('GET', '/api/scratchpad/notes');
+  assert(list.body.notes.map((note) => note.id).join(',') === 'live', 'the panel list shows only live notes');
+  const onDisk = JSON.parse(await readFile(join(dir, 'notes.json'), 'utf8'));
+  const diskIds = onDisk.notes.map((note) => note.id).sort().join(',');
+  assert(diskIds === 'fresh,live', 'expired soft-deletes are purged from disk, recent ones kept');
+  assert(!(await readdir(join(dir, 'files'))).includes('att-old.png'), 'purged attachments are removed from disk');
+  console.log('recovery (purge) test passed');
+} finally {
+  await sweeper.cleanup();
+}

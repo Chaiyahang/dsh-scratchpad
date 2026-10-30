@@ -24,6 +24,7 @@ window.__ModuleLoader__.load({
     const MIGRATION_FLAG = 'dsh-scratchpad-panel:host-migrated';
     const SAVE_DELAY = 300;
     const POLL_DELAY = 4000;
+    const UNDO_DELAY_MS = 8000;
     const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
     const DICTS = {
@@ -39,6 +40,8 @@ window.__ModuleLoader__.load({
         'panel.noResults': 'No note matches your search.',
         'panel.loadError': 'Could not read the note store. Check that the plugin host side is running.',
         'panel.draftRestored': 'Restored an unsaved draft.',
+        'panel.deleted': 'Note deleted — kept for 7 days.',
+        'panel.undo': 'Undo',
         'editor.placeholder': 'Jot an idea down…',
         'editor.image': 'Image',
         'editor.file': 'File',
@@ -91,6 +94,8 @@ window.__ModuleLoader__.load({
         'panel.noResults': '没有匹配的便签。',
         'panel.loadError': '无法读取便签存储，请确认插件 Host 端已加载。',
         'panel.draftRestored': '已恢复上次未保存的草稿。',
+        'panel.deleted': '便签已删除，7 天内可恢复。',
+        'panel.undo': '撤销',
         'editor.placeholder': '随手记点什么…',
         'editor.image': '图片',
         'editor.file': '文件',
@@ -208,6 +213,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__status[data-error="true"]{color:var(--dsw-alias-state-error-primary)}
 .dsh-sp__notice{flex:none;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsh-sp__conflict{flex:none;display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary)}
+.dsh-sp__trash{flex:none;display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
 .dsh-sp__list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 0 20px}
 .dsh-sp__listHeader{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding-top:2px}
 .dsh-sp__note{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:9px 12px 10px;transition:border-color .12s ease}
@@ -1098,6 +1104,8 @@ window.__ModuleLoader__.load({
       const [notice, setNotice] = useState('');
       /** Stored version the Host handed back on a 409, awaiting a user decision. */
       const [conflict, setConflict] = useState(null);
+      /** Last soft-deleted note, kept briefly so the user can undo. */
+      const [trash, setTrash] = useState(null);
       const [query, setQuery] = useState('');
       const [confirmId, setConfirmId] = useState(null);
       const [dragging, setDragging] = useState(false);
@@ -1114,6 +1122,7 @@ window.__ModuleLoader__.load({
       const dirtyRef = useRef(false);
       const timerRef = useRef(0);
       const confirmTimerRef = useRef(0);
+      const trashTimerRef = useRef(0);
       const textareaRef = useRef(null);
       const imageInputRef = useRef(null);
       const fileInputRef = useRef(null);
@@ -1552,8 +1561,27 @@ window.__ModuleLoader__.load({
             updateEditor(emptyEditor());
             setSaveState('idle');
           }
+          setTrash({ note });
+          window.clearTimeout(trashTimerRef.current);
+          trashTimerRef.current = window.setTimeout(() => setTrash(null), UNDO_DELAY_MS);
         })();
       }, [confirmId, flush, updateEditor]);
+
+      /** Undo: re-save the stored copy; soft-deleted notes and their files remain. */
+      const undoDelete = useCallback(() => {
+        const restore = trash?.note;
+        window.clearTimeout(trashTimerRef.current);
+        setTrash(null);
+        if (!restore) return;
+        void saveNoteRemote(restore)
+          .then((body) => {
+            applyToNotes(body.note);
+            setSaveState('saved');
+          })
+          .catch((error) => {
+            setNotice(error instanceof Error ? error.message : String(error));
+          });
+      }, [applyToNotes, trash]);
 
       const onPaste = useCallback((event) => {
         const files = Array.from(event.clipboardData?.files || []);
@@ -1828,6 +1856,9 @@ window.__ModuleLoader__.load({
           !ready
             ? h('div', { className: 'dsh-sp__empty' }, t('panel.loading'))
             : h(React.Fragment, null,
+              trash ? h('div', { className: 'dsh-sp__trash', role: 'status' },
+                h('span', null, t('panel.deleted')),
+                h('button', { type: 'button', className: 'dsh-sp__textBtn', onClick: undoDelete }, t('panel.undo'))) : null,
               h('div', { className: 'dsh-sp__listHeader' },
                 h('span', null, t('panel.listTitle')),
                 h('span', null, String(visibleNotes.length)),
