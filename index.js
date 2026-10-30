@@ -6,7 +6,7 @@
  * the Agent tools read and write the same durable store. The client talks to it
  * through the authenticated shared Fetch channel at `/api/scratchpad/*`.
  */
-import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { copyFile, link, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import os from 'node:os';
 
@@ -99,12 +99,19 @@ export function apply(ctx) {
     const backupTemp = `${backupFile}.${process.pid}.tmp`;
     await writeFile(temp, body, 'utf8');
     // Rotate the current document aside before replacing it, so the previous
-    // good generation survives a crash mid-write or a corrupting fault.
+    // good generation survives a crash mid-write or a corrupting fault. The
+    // rotation is a hard link — zero bytes copied; the old inode simply lives
+    // on as the backup once the rename below swaps in the new document.
     try {
-      await copyFile(notesFile, backupTemp);
+      await link(notesFile, backupTemp);
       await rename(backupTemp, backupFile);
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if (error?.code !== 'ENOENT') {
+        try {
+          await copyFile(notesFile, backupTemp);
+          await rename(backupTemp, backupFile);
+        } catch {}
+      }
     }
     await rename(temp, notesFile);
   }
