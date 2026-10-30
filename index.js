@@ -6,7 +6,7 @@
  * the Agent tools read and write the same durable store. The client talks to it
  * through the authenticated shared Fetch channel at `/api/scratchpad/*`.
  */
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import os from 'node:os';
 
@@ -21,6 +21,8 @@ const IMPORT_MAX_BYTES = 100 * 1024 * 1024;
 const MAX_IMPORT_NOTES = 5000;
 const MAX_TAGS = 12;
 const MAX_TAG_LENGTH = 32;
+/** Types a browser renders without executing anything; every other served file downloads. */
+const INLINE_IMAGE_TYPES = /^image\/(?:avif|bmp|gif|jpeg|jpg|png|webp|x-icon|vnd\.microsoft\.icon)$/;
 
 /** A request-level failure with the HTTP status the channel should report. */
 class HttpError extends Error {
@@ -34,6 +36,8 @@ export function apply(ctx) {
   const baseDir = resolveBaseDir(ctx);
   const filesDir = join(baseDir, 'files');
   const notesFile = join(baseDir, 'notes.json');
+  /** One-generation copy of the last good document, rotated in before every write. */
+  const backupFile = `${notesFile}.bak`;
 
   /** `{ revision, notes }`, loaded once and kept in memory. */
   let cache = null;
@@ -64,12 +68,22 @@ export function apply(ctx) {
         try {
           parsed = JSON.parse(await readFile(notesFile, 'utf8'));
         } catch (error) {
-          if (error?.code !== 'ENOENT') throw error;
+          // ENOENT is a first run. Anything else is a torn or corrupt document:
+          // archive the bytes for manual recovery, then fall back to the rotated
+          // backup — which is also the right source when the live file is gone
+          // because a previous recovery already archived it.
+          const corrupt = error?.code !== 'ENOENT';
+          if (corrupt) await archiveCorruptStore(notesFile);
+          try {
+            parsed = JSON.parse(await readFile(backupFile, 'utf8'));
+            if (corrupt) ctx.logger?.warn?.('scratchpad: notes.json was unreadable; recovered from notes.json.bak');
+          } catch {
+            parsed = null;
+            if (corrupt) ctx.logger?.warn?.('scratchpad: notes.json was unreadable and notes.json.bak did not help; started an empty store (the bytes are kept as notes.json.corrupt-*)');
+          }
         }
-        cache = {
-          revision: Number.isInteger(parsed?.revision) ? parsed.revision : 0,
-          notes: Array.isArray(parsed?.notes) ? parsed.notes.map(readNote).filter(Boolean) : [],
-        };
+        const state = sanitizeStore(parsed);
+        cache = state !== null ? state : { revision: 0, notes: [] };
         return cache;
       })().finally(() => {
         loading = null;
@@ -82,7 +96,16 @@ export function apply(ctx) {
     await mkdir(filesDir, { recursive: true });
     const body = `${JSON.stringify({ version: DATA_VERSION, revision: cache.revision, notes: cache.notes }, null, 2)}\n`;
     const temp = `${notesFile}.${process.pid}.tmp`;
+    const backupTemp = `${backupFile}.${process.pid}.tmp`;
     await writeFile(temp, body, 'utf8');
+    // Rotate the current document aside before replacing it, so the previous
+    // good generation survives a crash mid-write or a corrupting fault.
+    try {
+      await copyFile(notesFile, backupTemp);
+      await rename(backupTemp, backupFile);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
     await rename(temp, notesFile);
   }
 
@@ -341,14 +364,20 @@ export function apply(ctx) {
     } catch {
       return new Response('not found', { status: 404 });
     }
-    const disposition = url.searchParams.get('download') === '1' ? 'attachment' : 'inline';
+    // Inline only what a browser renders without running code — svg, html, pdf
+    // and friends are opaque bytes that download instead of rendering, so a
+    // hostile upload (or import) can never execute script in the app origin.
+    // The sandbox CSP is a second belt: even a mistyped document renders with
+    // no scripting and a unique origin.
+    const inline = INLINE_IMAGE_TYPES.test(attachment.type) && url.searchParams.get('download') !== '1';
     return new Response(bytes, {
       status: 200,
       headers: {
-        'content-type': attachment.type || 'application/octet-stream',
+        'content-type': inline ? attachment.type : 'application/octet-stream',
         'content-length': String(bytes.byteLength),
-        'content-disposition': `${disposition}; filename*=UTF-8''${encodeURIComponent(attachment.name)}`,
+        'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(attachment.name)}`,
         'cache-control': 'private, max-age=31536000, immutable',
+        'content-security-policy': 'sandbox',
         'x-content-type-options': 'nosniff',
       },
     });
@@ -736,6 +765,22 @@ function readTags(input) {
     if (tags.length >= MAX_TAGS) break;
   }
   return tags;
+}
+
+/** Normalize a parsed store document; null means "not a store document". */
+function sanitizeStore(parsed) {
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  return {
+    revision: Number.isInteger(parsed.revision) ? parsed.revision : 0,
+    notes: Array.isArray(parsed.notes) ? parsed.notes.map(readNote).filter(Boolean) : [],
+  };
+}
+
+/** Move an unreadable document aside, keeping the bytes for manual recovery. */
+async function archiveCorruptStore(path) {
+  try {
+    await rename(path, `${path}.corrupt-${new Date().toISOString().replace(/[:.]/g, '-')}`);
+  } catch {}
 }
 
 function readNote(input) {

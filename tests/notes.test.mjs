@@ -28,6 +28,33 @@ try {
   assert(result.status === 200 && result.headers.get('content-type') === 'image/png', 'serves the attachment');
   assert(result.buffer.equals(Buffer.from([9, 8, 7, 6])), 'served bytes match the upload');
 
+  // Only bitmap images render inline; anything that could execute script is
+  // opaque bytes that download, and every file response is sandboxed.
+  const hostile = await harness.request('POST', FILES, {
+    bytes: Buffer.from('<script>alert(1)</script>'),
+    query: { name: 'page.html', type: 'text/html' },
+  });
+  let served = await harness.request('GET', FILES, { query: { id: hostile.body.attachment.id } });
+  assert(served.headers.get('content-type') === 'application/octet-stream', 'html attachments are served as opaque bytes');
+  assert(served.headers.get('content-disposition')?.startsWith('attachment'), 'html attachments always download');
+  assert(served.headers.get('content-security-policy') === 'sandbox', 'file responses carry a sandbox CSP');
+
+  const svg = await harness.request('POST', FILES, {
+    bytes: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>'),
+    query: { name: 'icon.svg', type: 'image/svg+xml' },
+  });
+  served = await harness.request('GET', FILES, { query: { id: svg.body.attachment.id } });
+  assert(served.headers.get('content-type') === 'application/octet-stream', 'svg is served as opaque bytes');
+  assert(served.headers.get('content-disposition')?.startsWith('attachment'), 'svg never renders inline on direct open');
+
+  served = await harness.request('GET', FILES, { query: { id: attachment.id } });
+  assert(served.headers.get('content-disposition')?.startsWith('inline'), 'bitmap images stay inline');
+  served = await harness.request('GET', FILES, { query: { id: attachment.id, download: '1' } });
+  assert(served.headers.get('content-disposition')?.startsWith('attachment'), 'download=1 forces a bitmap download');
+
+  await harness.request('POST', '/api/scratchpad/files/delete', { json: { storedName: hostile.body.attachment.storedName } });
+  await harness.request('POST', '/api/scratchpad/files/delete', { json: { storedName: svg.body.attachment.storedName } });
+
   let output = await harness.runTool('scratchpad_create', {
     text: '标签测试',
     tags: ['工作', '工作', '  idea  ', '', 123, 'x'.repeat(40)],
