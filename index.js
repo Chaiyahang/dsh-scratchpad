@@ -109,13 +109,18 @@ export function apply(ctx) {
     await rename(temp, notesFile);
   }
 
-  /** Run one mutation against the live state, bump the revision, persist. */
+  /**
+   * Run one mutation against the live state, bump the revision, persist.
+   * Returning `false` from the operation declines the change: no bump, no write.
+   */
   function mutate(operation) {
     return enqueue(async () => {
       const state = await load();
       const result = await operation(state);
-      state.revision += 1;
-      await writeState();
+      if (result !== false) {
+        state.revision += 1;
+        await writeState();
+      }
       return result;
     });
   }
@@ -176,12 +181,35 @@ export function apply(ctx) {
     const input = body?.note;
     if (input === null || typeof input !== 'object') throw badRequest('missing note');
     const note = writeNote(input);
-    return mutate((state) => {
+    // `baseUpdatedAt` is the updatedAt the client last saw for this note. When
+    // it no longer matches the stored note, someone else (another window or an
+    // Agent tool) changed it in between — refuse instead of clobbering, and
+    // hand the stored version back so the client can offer a resolution.
+    const baseUpdatedAt = Number.isFinite(body?.baseUpdatedAt) ? Math.round(body.baseUpdatedAt) : null;
+    let stored = null;
+    let revision = 0;
+    await mutate((state) => {
       const index = state.notes.findIndex((item) => item.id === note.id);
-      if (index >= 0) state.notes[index] = note;
-      else state.notes.push(note);
-      return json({ ok: true, revision: state.revision + 1, note });
+      if (index < 0) {
+        state.notes.push(note);
+        revision = state.revision + 1;
+        return;
+      }
+      if (baseUpdatedAt !== null && state.notes[index].updatedAt !== baseUpdatedAt) {
+        stored = state.notes[index];
+        return false;
+      }
+      state.notes[index] = note;
+      revision = state.revision + 1;
     });
+    if (stored !== null) {
+      return json({
+        ok: false,
+        error: { code: 'scratchpad-conflict', message: 'the note changed elsewhere since it was loaded' },
+        note: stored,
+      }, 409);
+    }
+    return json({ ok: true, revision, note });
   }
 
   async function handleDeleteNote(request) {

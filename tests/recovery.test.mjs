@@ -10,6 +10,8 @@ try {
   await harness.request('POST', '/api/scratchpad/notes', { json: { note: { ...note, id: 'gen-1' } } });
   await harness.request('POST', '/api/scratchpad/notes', { json: { note: { ...note, id: 'gen-2' } } });
   // gen-1 now exists only in the rotated backup; gen-2 only in notes.json.
+  const backup = JSON.parse(await readFile(join(storeDir, 'notes.json.bak'), 'utf8'));
+  assert(backup.notes.length === 1 && backup.notes[0].id === 'gen-1', 'the previous generation is rotated to notes.json.bak');
 
   await writeFile(notesFile, '{"revision":9,"notes":[{"id":"to', 'utf8');
   harness.reload(); // cold cache: the next read must actually touch the disk

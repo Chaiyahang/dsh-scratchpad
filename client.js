@@ -47,6 +47,9 @@ window.__ModuleLoader__.load({
         'editor.saved': 'Saved',
         'editor.saveFailed': 'Save failed',
         'editor.rejected': 'Skipped (over 25 MB or unreadable):',
+        'editor.conflict': 'This note changed elsewhere while you were editing.',
+        'editor.conflictOverwrite': 'Keep my version',
+        'editor.conflictAdopt': 'Use the saved version',
         'editor.remove': 'Remove attachment',
         'note.pin': 'Pin note',
         'note.unpin': 'Unpin note',
@@ -96,6 +99,9 @@ window.__ModuleLoader__.load({
         'editor.saved': '已保存',
         'editor.saveFailed': '保存失败',
         'editor.rejected': '已跳过（超过 25 MB 或无法上传）：',
+        'editor.conflict': '编辑期间此便签在其他地方被修改过。',
+        'editor.conflictOverwrite': '保留我的版本',
+        'editor.conflictAdopt': '改用已保存版本',
         'editor.remove': '移除附件',
         'note.pin': '置顶',
         'note.unpin': '取消置顶',
@@ -199,6 +205,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__status{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
 .dsh-sp__status[data-error="true"]{color:var(--dsw-alias-state-error-primary)}
 .dsh-sp__notice{flex:none;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsh-sp__conflict{flex:none;display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary)}
 .dsh-sp__list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 0 20px}
 .dsh-sp__listHeader{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding-top:2px}
 .dsh-sp__note{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:9px 12px 10px;transition:border-color .12s ease}
@@ -237,7 +244,10 @@ window.__ModuleLoader__.load({
         body = await response.json();
       } catch {}
       if (!response.ok || !body || body.ok !== true) {
-        throw new Error(body?.error?.message || `HTTP ${response.status}`);
+        const error = new Error(body?.error?.message || `HTTP ${response.status}`);
+        error.status = response.status;
+        error.body = body;
+        throw error;
       }
       return body;
     }
@@ -246,11 +256,16 @@ window.__ModuleLoader__.load({
       return apiJson(`${API}/notes`);
     }
 
-    async function saveNoteRemote(note) {
+    /**
+     * Save one note. `baseUpdatedAt` is the updatedAt the caller last synced:
+     * when provided and the stored note moved on, the Host refuses with 409 and
+     * its current version. Omitting it saves unconditionally.
+     */
+    async function saveNoteRemote(note, baseUpdatedAt) {
       return apiJson(`${API}/notes`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ note }),
+        body: JSON.stringify(baseUpdatedAt === undefined ? { note } : { note, baseUpdatedAt }),
       });
     }
 
@@ -534,6 +549,7 @@ window.__ModuleLoader__.load({
           pinned: parsed.pinned === true,
           createdAt: Number(parsed.createdAt) || 0,
           updatedAt: Number(parsed.updatedAt) || 0,
+          baseUpdatedAt: Number(parsed.baseUpdatedAt) || 0,
           attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [],
         };
       } catch {
@@ -541,7 +557,7 @@ window.__ModuleLoader__.load({
       }
     }
 
-    function writeDraft(note) {
+    function writeDraft(note, baseUpdatedAt = 0) {
       try {
         if (!note.id && note.text.trim() === '' && note.tags.length === 0 && note.attachments.length === 0) {
           window.localStorage.removeItem(DRAFT_KEY);
@@ -554,6 +570,7 @@ window.__ModuleLoader__.load({
           pinned: note.pinned,
           createdAt: note.createdAt,
           updatedAt: note.updatedAt,
+          baseUpdatedAt,
           attachments: note.attachments,
         }));
       } catch {}
@@ -1058,6 +1075,8 @@ window.__ModuleLoader__.load({
       const [editor, setEditor] = useState(emptyEditor);
       const [saveState, setSaveState] = useState('idle');
       const [notice, setNotice] = useState('');
+      /** Stored version the Host handed back on a 409, awaiting a user decision. */
+      const [conflict, setConflict] = useState(null);
       const [query, setQuery] = useState('');
       const [confirmId, setConfirmId] = useState(null);
       const [dragging, setDragging] = useState(false);
@@ -1068,6 +1087,8 @@ window.__ModuleLoader__.load({
       const [selectedTag, setSelectedTag] = useState('');
 
       const editorRef = useRef(editor);
+      /** updatedAt of the version this editor last synced with the Host; 0 = no base. */
+      const baseRef = useRef(0);
       const pendingRef = useRef(null);
       const dirtyRef = useRef(false);
       const timerRef = useRef(0);
@@ -1089,7 +1110,7 @@ window.__ModuleLoader__.load({
 
       const queueDraft = useCallback((note) => {
         window.clearTimeout(draftTimerRef.current);
-        draftTimerRef.current = window.setTimeout(() => writeDraft(note), 250);
+        draftTimerRef.current = window.setTimeout(() => writeDraft(note, baseRef.current), 250);
       }, []);
 
       const applyToNotes = useCallback((note) => {
@@ -1110,8 +1131,9 @@ window.__ModuleLoader__.load({
         }
         setSaveState('saving');
         try {
-          const body = await saveNoteRemote(note);
+          const body = await saveNoteRemote(note, baseRef.current || undefined);
           applyToNotes(body.note);
+          baseRef.current = body.note.updatedAt;
           if (!pendingRef.current) {
             dirtyRef.current = false;
             window.clearTimeout(draftTimerRef.current);
@@ -1121,6 +1143,14 @@ window.__ModuleLoader__.load({
           return true;
         } catch (error) {
           dirtyRef.current = true;
+          if (error?.status === 409 && error.body?.note) {
+            // Someone saved a newer version: stop retrying and surface both
+            // versions instead of silently dropping either one.
+            window.clearTimeout(timerRef.current);
+            setConflict({ note: error.body.note });
+            setSaveState('error');
+            return false;
+          }
           if (!pendingRef.current) pendingRef.current = note;
           setSaveState('error');
           setNotice(error instanceof Error ? error.message : String(error));
@@ -1145,6 +1175,7 @@ window.__ModuleLoader__.load({
           if (draft === null) return false;
           const note = draft.id ? draft : withId(draft);
           updateEditor(note);
+          baseRef.current = draft.id ? (draft.baseUpdatedAt || 0) : 0;
           dirtyRef.current = true;
           setNotice(t('panel.draftRestored'));
           if (note.id) scheduleSave(note);
@@ -1161,6 +1192,7 @@ window.__ModuleLoader__.load({
             setLoadErrorMessage('');
             if (!restoreDraft() && sorted.length > 0) {
               updateEditor(copyOf(sorted[0]));
+              baseRef.current = sorted[0].updatedAt;
               setSaveState('saved');
             }
             setReady(true);
@@ -1188,7 +1220,7 @@ window.__ModuleLoader__.load({
           window.clearTimeout(timerRef.current);
           window.clearTimeout(confirmTimerRef.current);
           window.clearTimeout(draftTimerRef.current);
-          if (dirtyRef.current) writeDraft(editorRef.current);
+          if (dirtyRef.current) writeDraft(editorRef.current, baseRef.current);
           void flush();
         };
       }, [flush]);
@@ -1216,12 +1248,15 @@ window.__ModuleLoader__.load({
             const fresh = snapshot.notes.find((note) => note.id === current.id);
             if (!fresh) {
               updateEditor(emptyEditor());
+              setConflict(null);
+              baseRef.current = 0;
               setSaveState('idle');
               return;
             }
             if (fresh.updatedAt !== current.updatedAt || fresh.text !== current.text || fresh.pinned !== current.pinned
               || fresh.attachments.length !== current.attachments.length) {
               updateEditor(copyOf(fresh));
+              baseRef.current = fresh.updatedAt;
               setSaveState('saved');
             }
           } catch {} finally {
@@ -1371,6 +1406,8 @@ window.__ModuleLoader__.load({
         const saved = await flush();
         if (saved) clearDraft();
         dirtyRef.current = false;
+        setConflict(null);
+        baseRef.current = 0;
         updateEditor(emptyEditor());
         setSaveState('idle');
         setPreviewMode(false);
@@ -1386,18 +1423,83 @@ window.__ModuleLoader__.load({
         const saved = await flush();
         if (saved) clearDraft();
         dirtyRef.current = false;
+        setConflict(null);
         updateEditor(copyOf(note));
+        baseRef.current = note.updatedAt;
         setSaveState('saved');
         setTagDraft('');
         textareaRef.current?.focus();
       }, [flush, updateEditor]);
 
+      /** Overwrite the stored version with what is in the editor right now. */
+      const resolveOverwrite = useCallback(() => {
+        const current = editorRef.current;
+        setConflict(null);
+        if (!current.id) return;
+        const next = { ...current, updatedAt: Date.now() };
+        window.clearTimeout(timerRef.current);
+        pendingRef.current = null;
+        dirtyRef.current = true;
+        updateEditor(next);
+        setSaveState('saving');
+        void saveNoteRemote(next)
+          .then((body) => {
+            applyToNotes(body.note);
+            baseRef.current = body.note.updatedAt;
+            dirtyRef.current = false;
+            window.clearTimeout(draftTimerRef.current);
+            clearDraft();
+            setSaveState('saved');
+          })
+          .catch((error) => {
+            setSaveState('error');
+            setNotice(error instanceof Error ? error.message : String(error));
+          });
+      }, [applyToNotes, updateEditor]);
+
+      /** Drop the local edits and take over the version the Host handed back. */
+      const resolveAdopt = useCallback(() => {
+        const stored = conflict?.note;
+        setConflict(null);
+        if (!stored) return;
+        pendingRef.current = null;
+        window.clearTimeout(timerRef.current);
+        dirtyRef.current = false;
+        window.clearTimeout(draftTimerRef.current);
+        clearDraft();
+        updateEditor(copyOf(stored));
+        baseRef.current = stored.updatedAt;
+        setSaveState('saved');
+      }, [conflict, updateEditor]);
+
       const togglePin = useCallback((note) => {
         const next = { ...note, pinned: !note.pinned };
         setNotes((previous) => sortNotes(previous.map((item) => (item.id === note.id ? next : item))));
         if (editorRef.current.id === note.id) updateEditor({ ...editorRef.current, pinned: next.pinned });
-        saveNoteRemote(next).catch(() => setSaveState('error'));
-      }, [updateEditor]);
+        // A pin flip rewrites the whole note, so save it against the version it
+        // was read from; on a race, rebase onto the stored version and retry,
+        // so pinning never clobbers text changed elsewhere.
+        const attempt = async (target, triesLeft) => {
+          try {
+            const body = await saveNoteRemote({ ...target, pinned: !target.pinned }, target.updatedAt);
+            applyToNotes(body.note);
+            if (editorRef.current.id === target.id) {
+              updateEditor({ ...editorRef.current, pinned: body.note.pinned });
+              baseRef.current = body.note.updatedAt;
+            }
+            setSaveState('saved');
+          } catch (error) {
+            const stored = error?.status === 409 ? error.body?.note : null;
+            if (stored && triesLeft > 0) {
+              await attempt(stored, triesLeft - 1);
+              return;
+            }
+            setSaveState('error');
+            setNotice(error instanceof Error ? error.message : String(error));
+          }
+        };
+        void attempt(note, 2);
+      }, [applyToNotes, updateEditor]);
 
       const requestDelete = useCallback((note) => {
         if (confirmId !== note.id) {
@@ -1424,6 +1526,8 @@ window.__ModuleLoader__.load({
           setNotes((previous) => previous.filter((item) => item.id !== note.id));
           if (editorRef.current.id === note.id) {
             dirtyRef.current = false;
+            setConflict(null);
+            baseRef.current = 0;
             updateEditor(emptyEditor());
             setSaveState('idle');
           }
@@ -1497,6 +1601,7 @@ window.__ModuleLoader__.load({
           const fresh = current.id ? snapshot.notes.find((note) => note.id === current.id) : undefined;
           if (fresh && !dirtyRef.current) {
             updateEditor(copyOf(fresh));
+            baseRef.current = fresh.updatedAt;
             setSaveState('saved');
           }
           setNotice(t('data.imported'));
@@ -1650,6 +1755,18 @@ window.__ModuleLoader__.load({
             h('span', { className: 'dsh-sp__status', 'data-error': saveState === 'error' ? 'true' : 'false' },
               `${t('editor.chars')} ${editor.text.length}${statusLabel ? ` · ${statusLabel}` : ''}`)),
           notice ? h('div', { className: 'dsh-sp__notice', role: 'status' }, notice) : null,
+          conflict ? h('div', { className: 'dsh-sp__conflict', role: 'alert' },
+            h('span', null, t('editor.conflict')),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              onClick: resolveOverwrite,
+            }, t('editor.conflictOverwrite')),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              onClick: resolveAdopt,
+            }, t('editor.conflictAdopt'))) : null,
           h('input', {
             ref: imageInputRef,
             type: 'file',

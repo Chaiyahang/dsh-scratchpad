@@ -135,6 +135,28 @@ try {
   result = await harness.request('POST', '/api/scratchpad/import', { json: { document: { format: 'dsh-scratchpad', notes: [] } } });
   assert(result.status === 400, 'rejects an empty document');
 
+  // A save carrying the updatedAt the client last saw must be refused when the
+  // stored note moved on; the stored version rides along for resolution.
+  const staleNote = (updatedAt, text) => ({ id: 'stale', text, createdAt: 1, updatedAt, attachments: [] });
+  result = await harness.request('POST', '/api/scratchpad/notes', {
+    json: { note: staleNote(10, 'v1'), baseUpdatedAt: 10 },
+  });
+  assert(result.status === 200, 'a save with a matching base creates the note');
+  await harness.request('POST', '/api/scratchpad/notes', { json: { note: staleNote(20, 'v2') } });
+  result = await harness.request('POST', '/api/scratchpad/notes', {
+    json: { note: staleNote(30, 'v3'), baseUpdatedAt: 10 },
+  });
+  assert(result.status === 409 && result.body.error?.code === 'scratchpad-conflict', 'a stale base is refused with 409');
+  assert(result.body.note?.text === 'v2', 'the 409 body carries the stored version');
+  state = await harness.request('GET', '/api/scratchpad/notes');
+  assert(state.body.notes.find((item) => item.id === 'stale').text === 'v2', 'a refused save does not modify the store');
+  result = await harness.request('POST', '/api/scratchpad/notes', {
+    json: { note: staleNote(40, 'v4'), baseUpdatedAt: 20 },
+  });
+  assert(result.status === 200 && result.body.note.text === 'v4', 'saving against the current base succeeds');
+  result = await harness.request('POST', '/api/scratchpad/notes', { json: { note: staleNote(50, 'v5') } });
+  assert(result.status === 200 && result.body.note.text === 'v5', 'a save without a base stays unconditional');
+
   console.log('notes test passed');
 } finally {
   await harness.cleanup();

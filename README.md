@@ -66,7 +66,7 @@ dsh plugin --profile PROFILE add github:Chaiyahang/dsh-scratchpad
 - 每次写入前自动轮转 `notes.json.bak`；文件损坏时自动留档为 `notes.json.corrupt-*` 并从备份恢复
 - 图片直接预览；其他附件一律下载，不在浏览器内打开
 - 附件是真实文件，Agent 读取时拿到绝对路径；Markdown 渲染不执行 HTML
-- UI 与 Agent 同时修改同一条便签为最后写入优先
+- UI 保存会检测其他改动（另一窗口或 Agent）：冲突时面板让用户选择「保留我的版本 / 改用已保存版本」，不会静默覆盖；Agent 工具之间仍是最后写入优先
 - 导入只有合并模式；数据仅本机，不跨设备同步
 - composer 不接受附件时（子会话、类型不支持等），附件名会以文本形式保留
 

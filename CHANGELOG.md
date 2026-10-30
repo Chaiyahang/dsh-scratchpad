@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- 保存冲突检测：保存请求携带基准版本（`baseUpdatedAt`），Host 检测到便签已被其他窗口或 Agent 修改时返回 409 并附当前版本；面板提示冲突并提供「保留我的版本 / 改用已保存版本」，不再静默覆盖。置顶等快捷操作遇冲突会自动基于最新版本重试
+
 ### Security
 
 - 附件服务加固：仅位图格式（png/jpeg/gif/webp/avif/bmp/ico）以 inline 预览，SVG/HTML 等其余类型一律以 `application/octet-stream` + 下载响应；所有附件响应统一带 `Content-Security-Policy: sandbox`，恶意上传或导入的文件无法在应用 origin 内执行脚本
