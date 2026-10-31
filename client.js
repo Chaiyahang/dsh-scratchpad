@@ -72,6 +72,9 @@ window.__ModuleLoader__.load({
         'note.delete': 'Delete note',
         'note.confirmDelete': 'Sure?',
         'note.untitled': 'Empty note',
+        'group.pinned': 'Pinned',
+        'group.today': 'Today',
+        'group.yesterday': 'Yesterday',
         'note.pinnedFlag': 'Pinned',
         'group.pinned': 'Pinned',
         'group.today': 'Today',
@@ -147,6 +150,9 @@ window.__ModuleLoader__.load({
         'note.delete': '删除便签',
         'note.confirmDelete': '确认？',
         'note.untitled': '空白便签',
+        'group.pinned': '置顶',
+        'group.today': '今天',
+        'group.yesterday': '昨天',
         'note.pinnedFlag': '置顶',
         'group.pinned': '置顶',
         'group.today': '今天',
@@ -286,7 +292,11 @@ window.__ModuleLoader__.load({
 .dsh-sp__note.dsh-sp__note--pinned,.dsh-sp__note.dsh-sp__note--pinned[data-active="true"]{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
 .dsh-sp__noteTop{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;min-height:24px}
 .dsh-sp__noteTime{font-size:11.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
-.dsh-sp__noteTools{display:flex;align-items:center;gap:2px}
+.dsh-sp__noteTools{display:flex;align-items:center;gap:2px;visibility:hidden}
+.dsh-sp__note:hover .dsh-sp__noteTools,.dsh-sp__note:focus-within .dsh-sp__noteTools{visibility:visible}
+@media (hover:none){.dsh-sp__noteTools{visibility:visible}}
+.dsh-sp__groupHead{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--dsw-alias-label-secondary);margin:8px 0 0}
+.dsh-sp__groupHead::after{content:'';flex:1;height:1px;background:var(--dsw-alias-border-l1)}
 .dsh-sp__noteBtn{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border:none;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;cursor:pointer;padding:0 4px;font-size:11.5px;font-family:inherit;line-height:1}
 .dsh-sp__noteBtn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .dsh-sp__noteBtn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
@@ -1196,7 +1206,6 @@ window.__ModuleLoader__.load({
       return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false' },
         h('div', { className: 'dsh-sp__noteTop' },
           h('time', { className: 'dsh-sp__noteTime', dateTime: new Date(note.updatedAt).toISOString() }, formatTime(note.updatedAt)),
-          note.pinned ? h('span', { className: 'dsh-sp__pinnedFlag' }, h(PinIcon, null), t('note.pinnedFlag')) : null,
           h('div', { className: 'dsh-sp__noteTools' },
             h('button', {
               type: 'button',
@@ -2190,31 +2199,59 @@ window.__ModuleLoader__.load({
           },
         }));
         const listEmpty = (trashView ? trashed.length === 0 : visibleNotes.length === 0);
-        const listBody = listEmpty
-          ? h('div', { className: 'dsh-sp__empty' },
-              h('span', { className: 'dsh-sp__emptyIcon' }, h(EmptyIcon, null)),
-              h('span', null, trashView ? t('trash.empty') : query.trim() ? t('panel.noResults') : t('panel.empty')))
-          : h('div', { className: 'dsh-sp__list' },
-              trashView
-                ? trashed.map((note) => h(TrashCard, {
-                    key: note.id,
-                    note,
-                    t,
-                    onRestore: restoreNote,
-                    onDeleteForever: deleteForever,
-                  }))
-                : visibleNotes.map((note) => h(NoteCard, {
-                    key: note.id,
-                    note,
-                    active: editor.id === note.id,
-                    confirming: confirmId === note.id,
-                    t,
-                    onOpen: (target) => { void openNote(target); },
-                    onTogglePin: togglePin,
-                    onRequestDelete: requestDelete,
-                    onSend: sendToChat,
-                  })));
-        feedChildren.push(listBody);
+        if (listEmpty) {
+          feedChildren.push(h('div', { className: 'dsh-sp__empty' },
+            h('span', { className: 'dsh-sp__emptyIcon' }, h(EmptyIcon, null)),
+            h('span', null, trashView ? t('trash.empty') : query.trim() ? t('panel.noResults') : t('panel.empty'))));
+        } else if (trashView) {
+          feedChildren.push(h('div', { className: 'dsh-sp__list' },
+            trashed.map((note) => h(TrashCard, {
+              key: note.id,
+              note,
+              t,
+              onRestore: restoreNote,
+              onDeleteForever: deleteForever,
+            }))));
+        } else {
+          const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+          const groupLabel = (ts) => {
+            if (ts >= dayStart) return t('group.today');
+            if (ts >= dayStart - 86400000) return t('group.yesterday');
+            const d = new Date(ts);
+            const opts = d.getFullYear() === new Date().getFullYear() ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'short', day: 'numeric' };
+            return d.toLocaleDateString(undefined, opts);
+          };
+          const pinnedNotes = visibleNotes.filter((note) => note.pinned);
+          const dayNotes = visibleNotes.filter((note) => !note.pinned);
+          const sections = [];
+          if (pinnedNotes.length > 0) sections.push({ label: t('group.pinned'), cards: pinnedNotes });
+          let currentLabel = null;
+          let bucket = null;
+          for (const note of dayNotes) {
+            const label = groupLabel(note.updatedAt);
+            if (label !== currentLabel) {
+              bucket = { label, cards: [] };
+              sections.push(bucket);
+              currentLabel = label;
+            }
+            bucket.cards.push(note);
+          }
+          for (const section of sections) {
+            feedChildren.push(h('div', { className: 'dsh-sp__groupHead' }, section.label));
+            feedChildren.push(h('div', { className: 'dsh-sp__list' },
+              section.cards.map((note) => h(NoteCard, {
+                key: note.id,
+                note,
+                active: editor.id === note.id,
+                confirming: confirmId === note.id,
+                t,
+                onOpen: (target) => { void openNote(target); },
+                onTogglePin: togglePin,
+                onRequestDelete: requestDelete,
+                onSend: sendToChat,
+              }))));
+          }
+        }
       }
 
       return h('div', { className: 'dsh-sp', onDrop, onDragOver, onDragLeave },
