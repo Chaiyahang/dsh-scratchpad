@@ -168,7 +168,7 @@ window.__ModuleLoader__.load({
     /** Panel styles: theme tokens only, so light and dark both follow the shell. */
     const CSS = `
     .dsh-sp{display:flex;justify-content:center;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-family:inherit}
-    .dsh-sp__cols{display:flex;gap:16px;align-items:flex-start;flex:1;min-height:0}
+    .dsh-sp__cols{display:flex;gap:16px;flex:1;min-height:0}
     .dsh-sp__composerCol{flex:0 0 380px;display:flex;flex-direction:column;gap:10px;min-width:0}
     .dsh-sp__composerCol .dsh-sp__editor{flex:none}
     .dsh-sp__feedCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0}
@@ -188,7 +188,8 @@ window.__ModuleLoader__.load({
 .dsh-sp__search:focus{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__new{flex:none;display:inline-flex;align-items:center;gap:6px;border:none;border-radius:8px;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);padding:7px 11px;font-size:12.5px;font-weight:600;font-family:inherit;line-height:1.4;cursor:pointer}
 .dsh-sp__new:hover{opacity:.9}
-.dsh-sp__new:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+    .dsh-sp__new:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+    .dsh-sp__jotKbd{opacity:.6;margin-left:5px;font-weight:500}
 .dsh-sp__searchGroup{flex:1 1 240px;max-width:300px;min-width:170px;display:flex;align-items:center;gap:6px}
 .dsh-sp__searchGroup .dsh-sp__search{flex:1 1 auto;min-width:0}
 .dsh-sp__newGroup{flex:none;display:flex;align-items:center;gap:6px}
@@ -2090,7 +2091,7 @@ window.__ModuleLoader__.load({
                     className: 'dsh-sp__new',
                     title: t('editor.jotHint'),
                     onClick: () => { void startDraft(); },
-                  }, t('editor.jot'))),
+                  }, t('editor.jot'), h('span', { className: 'dsh-sp__jotKbd' }, isMacPlatform() ? '⌘↵' : 'Ctrl+↵'))),
                 notice ? h('div', { className: 'dsh-sp__notice', role: 'status' }, notice) : null,
                 conflict ? h('div', { className: 'dsh-sp__conflict', role: 'alert' },
                   h('span', null, t('editor.conflict')),
