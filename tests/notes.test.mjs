@@ -175,6 +175,20 @@ try {
   state = await harness.request('GET', '/api/scratchpad/notes');
   assert(state.body.notes.some((item) => item.id === 'trash-me'), 'the restored note is back in the list');
 
+  // The trash view lists soft-deleted notes; a permanent delete drops the files.
+  await harness.request('POST', '/api/scratchpad/notes/delete', { json: { id: 'trash-me' } });
+  result = await harness.request('GET', '/api/scratchpad/notes', { query: { view: 'trash' } });
+  assert(result.body.notes.length === 1 && result.body.notes[0].id === 'trash-me', 'the trash view lists soft-deleted notes');
+  state = await harness.request('GET', '/api/scratchpad/notes');
+  assert(state.body.notes.some((item) => item.id === 'stale') && !state.body.notes.some((item) => item.id === 'trash-me'),
+    'live and trash lists stay disjoint');
+  const trashFilesBefore = (await readdir(join(harness.dir, 'scratchpad', 'files'))).length;
+  await harness.request('POST', '/api/scratchpad/notes/delete', { json: { id: 'trash-me', permanent: true } });
+  result = await harness.request('GET', '/api/scratchpad/notes', { query: { view: 'trash' } });
+  assert(result.body.notes.length === 0, 'a permanent delete empties the trash entry');
+  assert((await readdir(join(harness.dir, 'scratchpad', 'files'))).length === trashFilesBefore - 1,
+    'a permanent delete removes the attachment files');
+
   console.log('notes test passed');
 } finally {
   await harness.cleanup();

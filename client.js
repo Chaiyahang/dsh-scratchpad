@@ -25,6 +25,7 @@ window.__ModuleLoader__.load({
     const SAVE_DELAY = 300;
     const POLL_DELAY = 4000;
     const UNDO_DELAY_MS = 8000;
+    const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
     const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
     const DICTS = {
@@ -43,6 +44,13 @@ window.__ModuleLoader__.load({
         'panel.deleted': 'Note deleted — kept for 7 days.',
         'panel.undo': 'Undo',
         'panel.updatedElsewhere': 'This note was just updated in another window or by the Agent.',
+        'trash.title': 'Trash',
+        'trash.back': 'Back to notes',
+        'trash.empty': 'Trash is empty.',
+        'trash.restore': 'Restore',
+        'trash.deleteForever': 'Delete forever',
+        'trash.expiresPrefix': 'auto-deletes in',
+        'trash.expiresSuffix': 'days',
         'editor.placeholder': 'Jot an idea down…',
         'editor.image': 'Image',
         'editor.file': 'File',
@@ -99,6 +107,13 @@ window.__ModuleLoader__.load({
         'panel.deleted': '便签已删除，7 天内可恢复。',
         'panel.undo': '撤销',
         'panel.updatedElsewhere': '此便签刚被其他窗口或 Agent 更新。',
+        'trash.title': '回收站',
+        'trash.back': '返回便签',
+        'trash.empty': '回收站是空的。',
+        'trash.restore': '恢复',
+        'trash.deleteForever': '彻底删除',
+        'trash.expiresPrefix': '剩',
+        'trash.expiresSuffix': '天自动清除',
         'editor.placeholder': '随手记点什么…',
         'editor.image': '图片',
         'editor.file': '文件',
@@ -281,12 +296,16 @@ window.__ModuleLoader__.load({
       });
     }
 
-    async function deleteNoteRemote(id) {
-      return apiJson(`${API}/notes/delete`, {
+    async function deleteNoteRemote(id, permanent) {
+      return apiJson(API + '/notes/delete', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify(permanent === true ? { id, permanent: true } : { id }),
       });
+    }
+
+    async function fetchTrashList() {
+      return apiJson(API + '/notes?view=trash');
     }
 
     async function uploadAttachment(file) {
@@ -828,6 +847,11 @@ window.__ModuleLoader__.load({
       return [...list].sort((left, right) => (Number(right.pinned) - Number(left.pinned)) || (right.updatedAt - left.updatedAt));
     }
 
+    /** Trash order: most recently deleted first. */
+    function sortByDeleted(list) {
+      return [...list].sort((left, right) => (right.deletedAt || 0) - (left.deletedAt || 0));
+    }
+
     function emptyEditor() {
       return { id: null, text: '', tags: [], pinned: false, createdAt: 0, updatedAt: 0, attachments: [] };
     }
@@ -1145,6 +1169,35 @@ window.__ModuleLoader__.load({
           note.tags.map((tag) => h('span', { key: tag, className: 'dsh-sp__noteTag' }, `#${tag}`))) : null));
     }
 
+    function TrashCard({ note, t, onRestore, onDeleteForever }) {
+      const preview = toPlainExcerpt(note.text).trim();
+      const daysLeft = Math.max(1, Math.ceil(((note.deletedAt || 0) + TRASH_RETENTION_MS - Date.now()) / 86400000));
+      const meta = [formatTime(note.deletedAt), t('trash.expiresPrefix') + ' ' + daysLeft + ' ' + t('trash.expiresSuffix')].join(' · ');
+      return h('article', { className: 'dsh-sp__note' },
+        h('div', { className: 'dsh-sp__noteTop' },
+          h('time', { className: 'dsh-sp__noteTime', dateTime: new Date(note.deletedAt || 0).toISOString() }, meta),
+          h('div', { className: 'dsh-sp__noteTools' },
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__noteBtn',
+              'aria-label': t('trash.restore'),
+              title: t('trash.restore'),
+              onClick: () => onRestore(note),
+            }, t('trash.restore')),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__noteBtn',
+              'data-danger': 'true',
+              'aria-label': t('trash.deleteForever'),
+              title: t('trash.deleteForever'),
+              onClick: () => onDeleteForever(note),
+            }, t('trash.deleteForever')))),
+        h('span', {
+          className: 'dsh-sp__noteText',
+          'data-empty': preview ? 'false' : 'true',
+        }, preview ? renderInline(preview) : t('note.untitled')));
+    }
+
     // ---------------------------------------------------------------------
     // The page
     // ---------------------------------------------------------------------
@@ -1162,6 +1215,10 @@ window.__ModuleLoader__.load({
       const [conflict, setConflict] = useState(null);
       /** Last soft-deleted note, kept briefly so the user can undo. */
       const [trash, setTrash] = useState(null);
+      /** Whether the list shows the trash instead of live notes. */
+      const [trashView, setTrashView] = useState(false);
+      /** Soft-deleted notes, refreshed alongside the live list. */
+      const [trashed, setTrashed] = useState([]);
       const [query, setQuery] = useState('');
       const [confirmId, setConfirmId] = useState(null);
       const [dragging, setDragging] = useState(false);
@@ -1276,6 +1333,9 @@ window.__ModuleLoader__.load({
             setNotes(sorted);
             setLoadError(false);
             setLoadErrorMessage('');
+            void fetchTrashList().then((result) => {
+              if (alive) setTrashed(sortByDeleted(result.notes));
+            }).catch(() => {});
             if (!restoreDraft() && sorted.length > 0) {
               updateEditor(copyOf(sorted[0]));
               baseRef.current = sorted[0].updatedAt;
@@ -1320,11 +1380,12 @@ window.__ModuleLoader__.load({
           if (busy || document.visibilityState !== 'visible') return;
           busy = true;
           try {
-            const snapshot = await fetchSnapshot();
+            const [snapshot, trashResult] = await Promise.all([fetchSnapshot(), fetchTrashList()]);
             if (!alive) return;
             setLoadError(false);
             setLoadErrorMessage('');
             setNotes(sortNotes(snapshot.notes));
+            setTrashed(sortByDeleted(trashResult.notes));
             if (pendingRef.current) {
               void flush();
               return;
@@ -1640,15 +1701,40 @@ window.__ModuleLoader__.load({
         window.clearTimeout(trashTimerRef.current);
         setTrash(null);
         if (!restore) return;
-        void saveNoteRemote(restore)
-          .then((body) => {
+        restoreNote(restore);
+      }, [restoreNote, trash]);
+
+      /**
+       * Bring a soft-deleted note back: re-save it (the Host keeps it until
+       * purged), then resync the list from an authoritative snapshot so an
+       * in-flight poll can never wipe the restored note back out.
+       */
+      const restoreNote = useCallback((restore) => {
+        void (async () => {
+          try {
+            const body = await saveNoteRemote(restore);
             applyToNotes(body.note);
+            const snapshot = await fetchSnapshot();
+            setNotes(sortNotes(snapshot.notes));
+            setTrashed(sortByDeleted((await fetchTrashList()).notes));
             setSaveState('saved');
-          })
-          .catch((error) => {
+          } catch (error) {
             setNotice(error instanceof Error ? error.message : String(error));
-          });
-      }, [applyToNotes, trash]);
+          }
+        })();
+      }, [applyToNotes]);
+
+      /** Hard-delete a trashed note and its files right away. */
+      const deleteForever = useCallback((note) => {
+        void (async () => {
+          try {
+            await deleteNoteRemote(note.id, true);
+            setTrashed((previous) => previous.filter((item) => item.id !== note.id));
+          } catch (error) {
+            setNotice(error instanceof Error ? error.message : String(error));
+          }
+        })();
+      }, []);
 
       const onPaste = useCallback((event) => {
         const files = Array.from(event.clipboardData?.files || []);
@@ -1939,21 +2025,26 @@ window.__ModuleLoader__.load({
                 h('span', null, t('panel.deleted')),
                 h('button', { type: 'button', className: 'dsh-sp__textBtn', onClick: undoDelete }, t('panel.undo'))) : null,
               h('div', { className: 'dsh-sp__listHeader' },
-                h('span', null, t('panel.listTitle')),
-                h('span', null, String(visibleNotes.length)),
+                h('span', null, trashView ? t('trash.title') : t('panel.listTitle')),
+                h('span', null, String(trashView ? trashed.length : visibleNotes.length)),
                 h('span', { className: 'dsh-sp__barSpacer' }),
-                h('a', {
+                trashView ? null : h('a', {
                   className: 'dsh-sp__textBtn',
-                  href: `${API}/export?attachments=1`,
+                  href: API + '/export?attachments=1',
                   title: t('data.exportHint'),
                 }, t('data.export')),
-                h('button', {
+                trashView ? null : h('button', {
                   type: 'button',
                   className: 'dsh-sp__textBtn',
                   title: t('data.importHint'),
                   disabled: importing,
                   onClick: () => importInputRef.current?.click(),
-                }, importing ? t('data.importing') : t('data.import'))),
+                }, importing ? t('data.importing') : t('data.import')),
+                h('button', {
+                  type: 'button',
+                  className: 'dsh-sp__textBtn',
+                  onClick: () => setTrashView(!trashView),
+                }, trashView ? t('trash.back') : t('trash.title') + ' ' + trashed.length)),
               allTags.length > 0 ? h('div', {
                 className: 'dsh-sp__filters',
                 role: 'group',
@@ -1972,12 +2063,20 @@ window.__ModuleLoader__.load({
                 'data-active': selectedTag === tag ? 'true' : 'false',
                 onClick: () => setSelectedTag(selectedTag === tag ? '' : tag),
               }, `${tag} ${count}`))) : null,
-              visibleNotes.length === 0
+              (trashView ? trashed.length === 0 : visibleNotes.length === 0)
                 ? h('div', { className: 'dsh-sp__empty' },
                   h('span', { className: 'dsh-sp__emptyIcon' }, h(EmptyIcon, null)),
-                  h('span', null, query.trim() ? t('panel.noResults') : t('panel.empty')))
+                  h('span', null, trashView ? t('trash.empty') : query.trim() ? t('panel.noResults') : t('panel.empty')))
                 : h('div', { className: 'dsh-sp__list' },
-                  visibleNotes.map((note) => h(NoteCard, {
+                  trashView
+                    ? trashed.map((note) => h(TrashCard, {
+                      key: note.id,
+                      note,
+                      t,
+                      onRestore: restoreNote,
+                      onDeleteForever: deleteForever,
+                    }))
+                    : visibleNotes.map((note) => h(NoteCard, {
                     key: note.id,
                     note,
                     active: editor.id === note.id,

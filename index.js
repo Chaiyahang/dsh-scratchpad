@@ -180,9 +180,15 @@ export function apply(ctx) {
   // Routes
   // -------------------------------------------------------------------
 
-  async function handleList() {
+  async function handleList(request) {
+    const url = new URL(request.url);
+    const trash = url.searchParams.get('view') === 'trash';
     const state = await readState();
-    return json({ ok: true, revision: state.revision, notes: state.notes.filter((note) => !note.deletedAt) });
+    return json({
+      ok: true,
+      revision: state.revision,
+      notes: state.notes.filter((note) => (trash ? note.deletedAt : !note.deletedAt)),
+    });
   }
 
   async function handleSave(request) {
@@ -225,6 +231,17 @@ export function apply(ctx) {
     const body = await readBody(request);
     const id = typeof body?.id === 'string' ? body.id : '';
     if (!id) throw badRequest('missing note id');
+    if (body?.permanent === true) {
+      // Hard delete from the trash view: drop the document and its files now.
+      const attachments = await mutate((state) => {
+        const index = state.notes.findIndex((item) => item.id === id);
+        if (index < 0) return [];
+        const [removed] = state.notes.splice(index, 1);
+        return removed.attachments;
+      });
+      await removeFiles(attachments);
+      return json({ ok: true });
+    }
     await mutate((state) => {
       const index = state.notes.findIndex((item) => item.id === id);
       if (index < 0 || state.notes[index].deletedAt) return false;
