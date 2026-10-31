@@ -208,8 +208,8 @@ window.__ModuleLoader__.load({
 .dsh-sp__editor{flex:none;display:flex;flex-direction:column;gap:10px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:12px 14px;transition:border-color .12s ease}
 .dsh-sp__editor:focus-within{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__editor[data-drag="true"]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
-    .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;min-height:180px;max-height:46vh;overflow-y:auto;padding:0;display:block}
-    .dsh-sp__preview{width:100%;box-sizing:border-box;min-height:180px;max-height:46vh;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
+    .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;flex:0 0 auto;min-height:120px;overflow-y:auto;padding:0;display:block}
+    .dsh-sp__preview{width:100%;box-sizing:border-box;flex:1 1 auto;min-height:120px;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
 .dsh-sp__previewEmpty{font-size:13px;color:var(--dsw-alias-label-secondary)}
 .dsh-sp__mdH{margin:2px 0 6px;line-height:1.35;color:var(--dsw-alias-label-primary);font-weight:600}
 .dsh-sp__mdH1{font-size:16px}
@@ -1973,6 +1973,24 @@ window.__ModuleLoader__.load({
         if (saveState === 'error') return t('editor.saveFailed');
         return '';
       })();
+
+      // Auto-grow the textarea to its content, capped at the composer card's
+      // leftover space: short notes keep attachments/tags/foot right under the
+      // text, long drafts fill the card and scroll internally.
+      useEffect(() => {
+        const element = textareaRef.current;
+        if (!element) return;
+        const card = element.closest('.dsh-sp__editor');
+        const col = element.closest('.dsh-sp__composerCol');
+        if (!card || !col) return;
+        element.style.height = 'auto';
+        let reserved = 24;
+        for (const child of card.children) {
+          if (child !== element) reserved += child.offsetHeight + 10;
+        }
+        const max = Math.max(140, col.clientHeight - reserved);
+        element.style.height = Math.min(element.scrollHeight, max) + 'px';
+      }, [editor.text, editor.id, editor.attachments.length, editor.tags.length, notice, conflict, previewMode]);
 
       const toolsBar = h('div', { className: 'dsh-sp__bar' },
         h('button', {
