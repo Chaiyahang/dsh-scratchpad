@@ -78,6 +78,7 @@ window.__ModuleLoader__.load({
         'editor.task': 'Task',
         'shortcut.open': 'Open scratchpad',
         'shortcut.new': 'New note',
+        'shortcut.search': 'Search notes',
         'data.export': 'Export',
         'data.exportHint': 'Download every note, attachments included, as one JSON file.',
         'data.import': 'Import',
@@ -141,6 +142,7 @@ window.__ModuleLoader__.load({
         'editor.task': '待办',
         'shortcut.open': '打开便签',
         'shortcut.new': '新建便签',
+        'shortcut.search': '搜索便签',
         'data.export': '导出',
         'data.exportHint': '把全部便签（含附件）导出为一个 JSON 文件。',
         'data.import': '导入',
@@ -174,6 +176,9 @@ window.__ModuleLoader__.load({
 .dsh-sp__new{flex:none;display:inline-flex;align-items:center;gap:6px;border:none;border-radius:8px;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);padding:7px 11px;font-size:12.5px;font-weight:600;font-family:inherit;line-height:1.4;cursor:pointer}
 .dsh-sp__new:hover{opacity:.9}
 .dsh-sp__new:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.dsh-sp__searchGroup{flex:1 1 240px;max-width:300px;min-width:170px;display:flex;align-items:center;gap:6px}
+.dsh-sp__searchGroup .dsh-sp__search{flex:1 1 auto;min-width:0}
+.dsh-sp__newGroup{flex:none;display:flex;align-items:center;gap:6px}
 .dsh-sp__editor{flex:none;display:flex;flex-direction:column;gap:10px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:12px 14px;transition:border-color .12s ease}
 .dsh-sp__editor:focus-within{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__editor[data-drag="true"]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
@@ -651,8 +656,8 @@ window.__ModuleLoader__.load({
     /** Set when the shortcut asks for the panel; consumed by the panel that mounts. */
     let scratchpadFocusPending = false;
     const scratchpadFocusListeners = new Set();
-    /** Display text of the binding that actually registered; empty when none did. */
-    let activeShortcutHint = '';
+    /** Display text of the bindings that actually registered, per action. */
+    const activeShortcutHints = { open: '', new: '', search: '' };
 
     function markScratchpadFocus() {
       scratchpadFocusPending = true;
@@ -698,6 +703,30 @@ window.__ModuleLoader__.load({
       return () => scratchpadNewListeners.delete(listener);
     }
 
+    /** Set when the search shortcut fires; consumed by the mounted panel. */
+    let scratchpadSearchPending = false;
+    const scratchpadSearchListeners = new Set();
+
+    function markScratchpadSearch() {
+      scratchpadSearchPending = true;
+      for (const listener of [...scratchpadSearchListeners]) {
+        try {
+          listener();
+        } catch {}
+      }
+    }
+
+    function takeScratchpadSearch() {
+      if (!scratchpadSearchPending) return false;
+      scratchpadSearchPending = false;
+      return true;
+    }
+
+    function onScratchpadSearchRequest(listener) {
+      scratchpadSearchListeners.add(listener);
+      return () => scratchpadSearchListeners.delete(listener);
+    }
+
     function isMacPlatform() {
       try {
         return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
@@ -712,13 +741,17 @@ window.__ModuleLoader__.load({
      * candidate is tried only when an earlier one is rejected by this host.
      */
     const OPEN_SHORTCUTS = [
-      { id: 'scratchpad.open', labelKey: 'shortcut.open', code: 'KeyS', modifiers: ['primary', 'shift'], mac: '⌘⇧S', other: 'Ctrl+Shift+S', web: true, titleHint: true },
-      { id: 'scratchpad.open.alt-s', labelKey: 'shortcut.open', code: 'KeyS', modifiers: ['primary', 'alt'], mac: '⌘⌥S', other: 'Ctrl+Alt+S', web: false },
-      { id: 'scratchpad.open.alt-n', labelKey: 'shortcut.open', code: 'KeyN', modifiers: ['primary', 'alt'], mac: '⌘⌥N', other: 'Ctrl+Alt+N', web: false },
+      { id: 'scratchpad.open', labelKey: 'shortcut.open', slot: 'open', code: 'KeyS', modifiers: ['primary', 'shift'], mac: '⌘⇧S', other: 'Ctrl+Shift+S', web: true, titleHint: true },
+      { id: 'scratchpad.open.alt-s', labelKey: 'shortcut.open', slot: 'open', code: 'KeyS', modifiers: ['primary', 'alt'], mac: '⌘⌥S', other: 'Ctrl+Alt+S', web: false },
+      { id: 'scratchpad.open.alt-n', labelKey: 'shortcut.open', slot: 'open', code: 'KeyN', modifiers: ['primary', 'alt'], mac: '⌘⌥N', other: 'Ctrl+Alt+N', web: false },
     ];
     const NEW_SHORTCUTS = [
-      { id: 'scratchpad.new', labelKey: 'shortcut.new', code: 'KeyN', modifiers: ['primary', 'shift'], mac: '⌘⇧N', other: 'Ctrl+Shift+N', web: false },
-      { id: 'scratchpad.new.alt-s', labelKey: 'shortcut.new', code: 'KeyS', modifiers: ['primary', 'alt', 'shift'], mac: '⌘⌥⇧S', other: 'Ctrl+Alt+Shift+S', web: false },
+      { id: 'scratchpad.new', labelKey: 'shortcut.new', slot: 'new', code: 'KeyN', modifiers: ['primary', 'shift'], mac: '⌘⇧N', other: 'Ctrl+Shift+N', web: false, titleHint: true },
+      { id: 'scratchpad.new.alt-s', labelKey: 'shortcut.new', slot: 'new', code: 'KeyS', modifiers: ['primary', 'alt', 'shift'], mac: '⌘⌥⇧S', other: 'Ctrl+Alt+Shift+S', web: false },
+    ];
+    const SEARCH_SHORTCUTS = [
+      { id: 'scratchpad.search', labelKey: 'shortcut.search', slot: 'search', code: 'KeyF', modifiers: ['primary', 'shift'], mac: '⌘⇧F', other: 'Ctrl+Shift+F', web: false, titleHint: true },
+      { id: 'scratchpad.search.alt', labelKey: 'shortcut.search', slot: 'search', code: 'KeyF', modifiers: ['primary', 'alt'], mac: '⌘⌥F', other: 'Ctrl+Alt+F', web: false },
     ];
 
     function shortcutCandidates(variants, t, onRun) {
@@ -1202,8 +1235,10 @@ window.__ModuleLoader__.load({
     // The page
     // ---------------------------------------------------------------------
 
-    function PanelPage({ t, sendToConversation, shortcutHint }) {
+    function PanelPage({ t, sendToConversation, shortcutHint, newHint, searchHint }) {
       const hint = typeof shortcutHint === 'function' ? shortcutHint() : '';
+      const newKbd = typeof newHint === 'function' ? newHint() : '';
+      const searchKbd = typeof searchHint === 'function' ? searchHint() : '';
       const [notes, setNotes] = useState([]);
       const [ready, setReady] = useState(false);
       const [loadError, setLoadError] = useState(false);
@@ -1236,6 +1271,7 @@ window.__ModuleLoader__.load({
       const timerRef = useRef(0);
       const confirmTimerRef = useRef(0);
       const trashTimerRef = useRef(0);
+      const searchInputRef = useRef(null);
       const textareaRef = useRef(null);
       const imageInputRef = useRef(null);
       const fileInputRef = useRef(null);
@@ -1573,6 +1609,25 @@ window.__ModuleLoader__.load({
         return off;
       }, [startDraft]);
 
+      /** Search shortcut: focus and select the search box. */
+      const focusSearchInput = useCallback(() => {
+        const element = searchInputRef.current;
+        if (!element) return;
+        element.focus();
+        try {
+          element.select();
+        } catch {}
+      }, []);
+
+      // Search shortcut: consumed here when mounted, or once the panel mounts.
+      useEffect(() => {
+        const off = onScratchpadSearchRequest(() => {
+          if (takeScratchpadSearch()) focusSearchInput();
+        });
+        if (takeScratchpadSearch()) focusSearchInput();
+        return off;
+      }, [focusSearchInput]);
+
       const openNote = useCallback(async (note) => {
         if (editorRef.current.id === note.id) {
           textareaRef.current?.focus();
@@ -1863,19 +1918,24 @@ window.__ModuleLoader__.load({
                 hint ? h('kbd', { className: 'dsh-sp__kbd', title: t('shortcut.open') }, hint) : null,
                 h('span', { className: 'dsh-sp__version', title: `${t('panel.version')} ${VERSION}` }, `v${VERSION}`)),
               h('p', { className: 'dsh-sp__subtitle' }, t('panel.subtitle'))),
-            h('input', {
-              type: 'search',
-              className: 'dsh-sp__search',
-              value: query,
-              placeholder: t('panel.search'),
-              'aria-label': t('panel.search'),
-              onChange: (event) => setQuery(event.target.value),
-            }),
-            h('button', {
-              type: 'button',
-              className: 'dsh-sp__new',
-              onClick: () => { void startDraft(); },
-            }, h(PlusIcon, null), t('panel.new'))),
+            h('div', { className: 'dsh-sp__searchGroup' },
+              searchKbd ? h('kbd', { className: 'dsh-sp__kbd', title: t('shortcut.search') }, searchKbd) : null,
+              h('input', {
+                ref: searchInputRef,
+                type: 'search',
+                className: 'dsh-sp__search',
+                value: query,
+                placeholder: t('panel.search'),
+                'aria-label': t('panel.search'),
+                onChange: (event) => setQuery(event.target.value),
+              })),
+            h('div', { className: 'dsh-sp__newGroup' },
+              newKbd ? h('kbd', { className: 'dsh-sp__kbd', title: t('shortcut.new') }, newKbd) : null,
+              h('button', {
+                type: 'button',
+                className: 'dsh-sp__new',
+                onClick: () => { void startDraft(); },
+              }, h(PlusIcon, null), t('panel.new')))),
 
           h('section', {
             className: 'dsh-sp__editor',
@@ -2122,7 +2182,9 @@ window.__ModuleLoader__.load({
           inject: () => ({
             t,
             sendToConversation: () => ctx.layout.selectPanel('conversation'),
-            shortcutHint: () => activeShortcutHint,
+            shortcutHint: () => activeShortcutHints.open,
+            newHint: () => activeShortcutHints.new,
+            searchHint: () => activeShortcutHints.search,
           }),
         }, PanelPage));
 
@@ -2150,15 +2212,20 @@ window.__ModuleLoader__.load({
                 markScratchpadNew();
                 ctx.layout.selectPanel(PANEL_ID);
               };
+              const focusSearch = () => {
+                markScratchpadSearch();
+                ctx.layout.selectPanel(PANEL_ID);
+              };
               const candidates = [
                 ...shortcutCandidates(OPEN_SHORTCUTS, t, openPanel),
                 ...shortcutCandidates(NEW_SHORTCUTS, t, startNew),
+                ...shortcutCandidates(SEARCH_SHORTCUTS, t, focusSearch),
               ];
               const disposers = [];
               for (const candidate of candidates) {
                 try {
                   disposers.push(shortcuts.register(candidate.definition));
-                  if (candidate.titleHint) activeShortcutHint = candidate.hint;
+                  if (candidate.titleHint) activeShortcutHints[candidate.slot] = candidate.hint;
                 } catch (error) {
                   scoped.logger?.warn?.('scratchpad: shortcut ' + candidate.definition.id + ' unavailable: ' + (error instanceof Error ? error.message : String(error)));
                 }
