@@ -72,10 +72,6 @@ window.__ModuleLoader__.load({
         'note.delete': 'Delete note',
         'note.confirmDelete': 'Sure?',
         'note.untitled': 'Empty note',
-        'note.pinnedFlag': 'Pinned',
-        'group.pinned': 'Pinned',
-        'group.today': 'Today',
-        'group.yesterday': 'Yesterday',
         'note.open': 'Open note',
         'note.send': 'Send to conversation',
         'note.attachments': 'Attachments',
@@ -144,10 +140,6 @@ window.__ModuleLoader__.load({
         'note.delete': '删除便签',
         'note.confirmDelete': '确认？',
         'note.untitled': '空白便签',
-        'note.pinnedFlag': '置顶',
-        'group.pinned': '置顶',
-        'group.today': '今天',
-        'group.yesterday': '昨天',
         'note.open': '打开便签',
         'note.send': '发送到对话',
         'note.attachments': '附件',
@@ -180,8 +172,8 @@ window.__ModuleLoader__.load({
     .dsh-sp{display:flex;justify-content:center;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-family:inherit}
     .dsh-sp__cols{display:flex;gap:16px;flex:1;min-height:0}
     .dsh-sp__composerCol{flex:0 0 380px;display:flex;flex-direction:column;gap:10px;min-width:0}
-    .dsh-sp__composerCol .dsh-sp__editor{flex:1;min-height:0}
-    .dsh-sp__feedCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;padding-bottom:20px}
+    .dsh-sp__composerCol .dsh-sp__editor{flex:none}
+    .dsh-sp__feedCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0}
     .dsh-sp__composerFold{display:flex;align-items:center;gap:8px;width:100%;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:12px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
     .dsh-sp__composerFold:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
     @media (max-width:900px){.dsh-sp__cols{flex-direction:column}.dsh-sp__composerCol{flex:none;width:auto}}
@@ -208,8 +200,8 @@ window.__ModuleLoader__.load({
 .dsh-sp__editor{flex:none;display:flex;flex-direction:column;gap:10px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:12px 14px;transition:border-color .12s ease}
 .dsh-sp__editor:focus-within{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__editor[data-drag="true"]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
-    .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;flex:0 0 auto;min-height:120px;overflow-y:auto;padding:0;display:block}
-    .dsh-sp__preview{width:100%;box-sizing:border-box;flex:1 1 auto;min-height:120px;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
+    .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;min-height:180px;max-height:46vh;overflow-y:auto;padding:0;display:block}
+    .dsh-sp__preview{width:100%;box-sizing:border-box;min-height:180px;max-height:46vh;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
 .dsh-sp__previewEmpty{font-size:13px;color:var(--dsw-alias-label-secondary)}
 .dsh-sp__mdH{margin:2px 0 6px;line-height:1.35;color:var(--dsw-alias-label-primary);font-weight:600}
 .dsh-sp__mdH1{font-size:16px}
@@ -236,7 +228,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__filters{flex:none;display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;padding:2px 0}
 .dsh-sp__filter{flex:none;border:1px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:999px;padding:2px 9px;font-size:11.5px;font-family:inherit;line-height:1.6;cursor:pointer;white-space:nowrap}
 .dsh-sp__filter:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
-.dsh-sp__filter[data-active="true"]{background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-base);border-color:var(--dsw-alias-label-primary)}
+.dsh-sp__filter[data-active="true"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
 .dsh-sp__noteTags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
     .dsh-sp__noteTag{font-size:11.5px;line-height:1.7;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:999px;padding:2px 8px}
 .dsh-sp__textarea::placeholder{color:var(--dsw-alias-label-secondary);opacity:.85}
@@ -264,10 +256,10 @@ window.__ModuleLoader__.load({
 .dsh-sp__notice{flex:none;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsh-sp__conflict{flex:none;display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary)}
 .dsh-sp__trash{flex:none;display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
-.dsh-sp__list{display:flex;flex-direction:column;gap:10px;padding:2px 0 20px}
+.dsh-sp__list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 0 20px}
     .dsh-sp__listHeader{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding-top:2px}
     .dsh-sp__toolbar{background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:8px}
-    .dsh-sp__about{background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;padding:8px 12px;display:flex;flex-direction:row;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:11.5px;color:var(--dsw-alias-label-secondary)}
+    .dsh-sp__about{background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--dsw-alias-label-secondary)}
     .dsh-sp__aboutRow{display:flex;align-items:center;gap:8px}
     .dsh-sp__aboutNote{margin-top:2px;word-break:break-all}
 .dsh-sp__note{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:9px 12px 10px;transition:border-color .12s ease}
@@ -275,13 +267,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__note[data-active="true"]{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__noteTop{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;min-height:24px}
 .dsh-sp__noteTime{font-size:11.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
-.dsh-sp__noteTools{display:flex;align-items:center;gap:2px;visibility:hidden}
-.dsh-sp__note:hover .dsh-sp__noteTools,.dsh-sp__note:focus-within .dsh-sp__noteTools{visibility:visible}
-@media (hover:none){.dsh-sp__noteTools{visibility:visible}}
-.dsh-sp__groupHead{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--dsw-alias-label-secondary);margin:8px 0 0}
-.dsh-sp__groupHead::after{content:'';flex:1;height:1px;background:var(--dsw-alias-border-l1)}
-.dsh-sp__note--pinned{background:var(--dsw-alias-bg-layer-1);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 5%,var(--dsw-alias-bg-layer-1))}
-.dsh-sp__pinnedFlag{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--dsw-alias-brand-primary)}
+.dsh-sp__noteTools{display:flex;align-items:center;gap:2px}
 .dsh-sp__noteBtn{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border:none;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;cursor:pointer;padding:0 4px;font-size:11.5px;font-family:inherit;line-height:1}
 .dsh-sp__noteBtn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .dsh-sp__noteBtn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
@@ -1188,10 +1174,9 @@ window.__ModuleLoader__.load({
 
     function NoteCard({ note, active, confirming, t, onOpen, onTogglePin, onRequestDelete, onSend }) {
       const preview = toPlainExcerpt(note.text).trim();
-      return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false' },
+      return h('article', { className: 'dsh-sp__note', 'data-active': active ? 'true' : 'false' },
         h('div', { className: 'dsh-sp__noteTop' },
           h('time', { className: 'dsh-sp__noteTime', dateTime: new Date(note.updatedAt).toISOString() }, formatTime(note.updatedAt)),
-          note.pinned ? h('span', { className: 'dsh-sp__pinnedFlag' }, t('note.pinnedFlag')) : null,
           h('div', { className: 'dsh-sp__noteTools' },
             h('button', {
               type: 'button',
@@ -1511,8 +1496,15 @@ window.__ModuleLoader__.load({
         return () => window.clearTimeout(timer);
       }, [notice]);
 
-      // The editor card fills the left column: flexbox sizes the textarea, so
-      // long drafts scroll internally and the note list always stays visible.
+      // Auto-grow the editor: it opens at ~7 lines and grows to just under half
+      // the window, then scrolls internally so the note list stays visible.
+      useEffect(() => {
+        const element = textareaRef.current;
+        if (!element) return;
+        element.style.height = 'auto';
+        const max = Math.round(window.innerHeight * 0.46);
+        element.style.height = Math.min(element.scrollHeight, max) + 'px';
+      }, [editor.text, editor.id]);
 
       // Shortcut wake-up: focus the editor now when already mounted, or once the
       // freshly selected panel has rendered.
@@ -1974,24 +1966,6 @@ window.__ModuleLoader__.load({
         return '';
       })();
 
-      // Auto-grow the textarea to its content, capped at the composer card's
-      // leftover space: short notes keep attachments/tags/foot right under the
-      // text, long drafts fill the card and scroll internally.
-      useEffect(() => {
-        const element = textareaRef.current;
-        if (!element) return;
-        const card = element.closest('.dsh-sp__editor');
-        const col = element.closest('.dsh-sp__composerCol');
-        if (!card || !col) return;
-        element.style.height = 'auto';
-        let reserved = 24;
-        for (const child of card.children) {
-          if (child !== element) reserved += child.offsetHeight + 10;
-        }
-        const max = Math.max(140, col.clientHeight - reserved);
-        element.style.height = Math.min(element.scrollHeight, max) + 'px';
-      }, [editor.text, editor.id, editor.attachments.length, editor.tags.length, notice, conflict, previewMode]);
-
       const toolsBar = h('div', { className: 'dsh-sp__bar' },
         h('button', {
           type: 'button',
@@ -2206,59 +2180,31 @@ window.__ModuleLoader__.load({
           },
         }));
         const listEmpty = (trashView ? trashed.length === 0 : visibleNotes.length === 0);
-        if (listEmpty) {
-          feedChildren.push(h('div', { className: 'dsh-sp__empty' },
-            h('span', { className: 'dsh-sp__emptyIcon' }, h(EmptyIcon, null)),
-            h('span', null, trashView ? t('trash.empty') : query.trim() ? t('panel.noResults') : t('panel.empty'))));
-        } else if (trashView) {
-          feedChildren.push(h('div', { className: 'dsh-sp__list' },
-            trashed.map((note) => h(TrashCard, {
-              key: note.id,
-              note,
-              t,
-              onRestore: restoreNote,
-              onDeleteForever: deleteForever,
-            }))));
-        } else {
-          const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
-          const groupLabel = (ts) => {
-            if (ts >= dayStart) return t('group.today');
-            if (ts >= dayStart - 86400000) return t('group.yesterday');
-            const d = new Date(ts);
-            const opts = d.getFullYear() === new Date().getFullYear() ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'short', day: 'numeric' };
-            return d.toLocaleDateString(undefined, opts);
-          };
-          const pinnedNotes = visibleNotes.filter((note) => note.pinned);
-          const dayNotes = visibleNotes.filter((note) => !note.pinned);
-          const sections = [];
-          if (pinnedNotes.length > 0) sections.push({ label: t('group.pinned'), cards: pinnedNotes });
-          let currentLabel = null;
-          let bucket = null;
-          for (const note of dayNotes) {
-            const label = groupLabel(note.updatedAt);
-            if (label !== currentLabel) {
-              bucket = { label, cards: [] };
-              sections.push(bucket);
-              currentLabel = label;
-            }
-            bucket.cards.push(note);
-          }
-          for (const section of sections) {
-            feedChildren.push(h('div', { className: 'dsh-sp__groupHead' }, section.label));
-            feedChildren.push(h('div', { className: 'dsh-sp__list' },
-              section.cards.map((note) => h(NoteCard, {
-                key: note.id,
-                note,
-                active: editor.id === note.id,
-                confirming: confirmId === note.id,
-                t,
-                onOpen: (target) => { void openNote(target); },
-                onTogglePin: togglePin,
-                onRequestDelete: requestDelete,
-                onSend: sendToChat,
-              }))));
-          }
-        }
+        const listBody = listEmpty
+          ? h('div', { className: 'dsh-sp__empty' },
+              h('span', { className: 'dsh-sp__emptyIcon' }, h(EmptyIcon, null)),
+              h('span', null, trashView ? t('trash.empty') : query.trim() ? t('panel.noResults') : t('panel.empty')))
+          : h('div', { className: 'dsh-sp__list' },
+              trashView
+                ? trashed.map((note) => h(TrashCard, {
+                    key: note.id,
+                    note,
+                    t,
+                    onRestore: restoreNote,
+                    onDeleteForever: deleteForever,
+                  }))
+                : visibleNotes.map((note) => h(NoteCard, {
+                    key: note.id,
+                    note,
+                    active: editor.id === note.id,
+                    confirming: confirmId === note.id,
+                    t,
+                    onOpen: (target) => { void openNote(target); },
+                    onTogglePin: togglePin,
+                    onRequestDelete: requestDelete,
+                    onSend: sendToChat,
+                  })));
+        feedChildren.push(listBody);
       }
 
       return h('div', { className: 'dsh-sp', onDrop, onDragOver, onDragLeave },
