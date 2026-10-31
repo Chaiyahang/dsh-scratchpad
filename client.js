@@ -298,7 +298,8 @@ window.__ModuleLoader__.load({
 @media (hover:none){.dsh-sp__noteTools{visibility:visible}}
 .dsh-sp__groupHead{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--dsw-alias-label-secondary);margin:8px 0 0}
 .dsh-sp__groupHead::after{content:'';flex:1;height:1px;background:var(--dsw-alias-border-l1)}
-.dsh-sp__noteBtn{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border:none;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;cursor:pointer;padding:0 4px;font-size:11.5px;font-family:inherit;line-height:1}
+.dsh-sp__noteBtn{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;border:none;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:7px;cursor:pointer;padding:0 4px;font-size:12.5px;font-family:inherit;line-height:1}
+.dsh-sp__noteBtn svg{width:15px;height:15px}
 .dsh-sp__noteBtn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .dsh-sp__noteBtn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
 .dsh-sp__noteBtn[data-pinned="true"]{color:var(--dsw-alias-brand-primary)}
