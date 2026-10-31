@@ -4,7 +4,7 @@ const source = readFileSync(new URL('../client.js', import.meta.url), 'utf8');
 
 // Extract the whole module factory body (constants + helpers + components) so a
 // render-time crash — the "blank panel" class of regressions — fails here.
-const start = source.indexOf('    const DICTS = {');
+const start = source.indexOf("    const NS = 'scratchpad';");
 const end = source.indexOf('    return {\n      inject:', start);
 if (start < 0 || end < 0) throw new Error('client.js factory markers not found');
 const body = source.slice(start, end);
