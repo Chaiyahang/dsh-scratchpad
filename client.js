@@ -758,6 +758,7 @@ window.__ModuleLoader__.load({
       const mac = isMacPlatform();
       return variants.map((variant) => ({
         hint: mac ? variant.mac : variant.other,
+        slot: variant.slot,
         titleHint: variant.titleHint === true,
         definition: {
           id: variant.id,
