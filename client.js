@@ -2229,13 +2229,12 @@ window.__ModuleLoader__.load({
                   onChange: (event) => setQuery(event.target.value),
                 }),
                 searchKbd ? h('kbd', { className: 'dsh-sp__kbd dsh-sp__kbdIn', title: t('shortcut.search') }, searchKbd) : null)),
-            h('div', { className: 'dsh-sp__newGroup' },
-              newKbd ? h('kbd', { className: 'dsh-sp__kbd', title: t('shortcut.new') }, newKbd) : null,
-              h('button', {
-                type: 'button',
-                className: 'dsh-sp__new',
-                onClick: () => { void startDraft(); },
-              }, h(PlusIcon, null), t('panel.new'), h('span', { className: 'dsh-sp__jotKbd' }, newKbd || '⌘⇧N')))),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__new',
+              title: t('shortcut.new'),
+              onClick: () => { void startDraft(); },
+            }, h(PlusIcon, null), t('panel.new'), h('span', { className: 'dsh-sp__jotKbd' }, newKbd || '⌘⇧N'))),
           h('div', { className: 'dsh-sp__cols' },
             trashView ? null : h('div', { className: 'dsh-sp__composerCol' },
               narrow && !composerOpen
