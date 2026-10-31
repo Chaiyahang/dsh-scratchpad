@@ -62,6 +62,9 @@ window.__ModuleLoader__.load({
         'editor.conflict': 'This note changed elsewhere while you were editing.',
         'editor.conflictOverwrite': 'Keep my version',
         'editor.conflictAdopt': 'Use the saved version',
+        'editor.foldNew': 'New note…',
+        'editor.jot': 'Jot it down',
+        'editor.jotHint': '⌘/Ctrl+Enter — finish this note and start the next',
         'editor.remove': 'Remove attachment',
         'note.pin': 'Pin note',
         'note.unpin': 'Unpin note',
@@ -126,6 +129,9 @@ window.__ModuleLoader__.load({
         'editor.conflict': '编辑期间此便签在其他地方被修改过。',
         'editor.conflictOverwrite': '保留我的版本',
         'editor.conflictAdopt': '改用已保存版本',
+        'editor.foldNew': '记一条…',
+        'editor.jot': '记一下',
+        'editor.jotHint': '⌘/Ctrl+Enter · 结束这条并开始下一条',
         'editor.remove': '移除附件',
         'note.pin': '置顶',
         'note.unpin': '取消置顶',
@@ -161,8 +167,15 @@ window.__ModuleLoader__.load({
 
     /** Panel styles: theme tokens only, so light and dark both follow the shell. */
     const CSS = `
-.dsh-sp{display:flex;justify-content:center;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-family:inherit}
-.dsh-sp__inner{display:flex;flex-direction:column;gap:14px;width:100%;max-width:1000px;min-height:0;height:100%;padding:20px 24px 0;box-sizing:border-box}
+    .dsh-sp{display:flex;justify-content:center;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-family:inherit}
+    .dsh-sp__cols{display:flex;gap:16px;align-items:flex-start;flex:1;min-height:0}
+    .dsh-sp__composerCol{flex:0 0 380px;display:flex;flex-direction:column;gap:10px;min-width:0}
+    .dsh-sp__composerCol .dsh-sp__editor{flex:none}
+    .dsh-sp__feedCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0}
+    .dsh-sp__composerFold{display:flex;align-items:center;gap:8px;width:100%;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:12px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
+    .dsh-sp__composerFold:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
+    @media (max-width:900px){.dsh-sp__cols{flex-direction:column}.dsh-sp__composerCol{flex:none;width:auto}}
+    .dsh-sp__inner{display:flex;flex-direction:column;gap:14px;width:100%;max-width:1100px;min-height:0;height:100%;padding:20px 24px 0;box-sizing:border-box}
 .dsh-sp__header{flex:none;display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .dsh-sp__titles{flex:1 1 160px;min-width:0}
 .dsh-sp__titleRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -182,8 +195,8 @@ window.__ModuleLoader__.load({
 .dsh-sp__editor{flex:none;display:flex;flex-direction:column;gap:10px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:12px 14px;transition:border-color .12s ease}
 .dsh-sp__editor:focus-within{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__editor[data-drag="true"]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
-.dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;min-height:58px;max-height:42vh;overflow-y:auto;padding:0;display:block}
-.dsh-sp__preview{width:100%;box-sizing:border-box;min-height:58px;max-height:42vh;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
+    .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;min-height:180px;max-height:46vh;overflow-y:auto;padding:0;display:block}
+    .dsh-sp__preview{width:100%;box-sizing:border-box;min-height:180px;max-height:46vh;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
 .dsh-sp__previewEmpty{font-size:13px;color:var(--dsw-alias-label-secondary)}
 .dsh-sp__mdH{margin:2px 0 6px;line-height:1.35;color:var(--dsw-alias-label-primary);font-weight:600}
 .dsh-sp__mdH1{font-size:16px}
@@ -212,7 +225,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__filter:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .dsh-sp__filter[data-active="true"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
 .dsh-sp__noteTags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
-.dsh-sp__noteTag{font-size:10.5px;line-height:1.7;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-2);border-radius:999px;padding:0 6px}
+    .dsh-sp__noteTag{font-size:11.5px;line-height:1.7;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-2);border-radius:999px;padding:2px 8px}
 .dsh-sp__textarea::placeholder{color:var(--dsw-alias-label-secondary);opacity:.85}
 .dsh-sp__tiles{display:flex;flex-wrap:wrap;gap:8px}
 .dsh-sp__tile{position:relative;width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);flex:none}
@@ -1255,6 +1268,9 @@ window.__ModuleLoader__.load({
       const [trashView, setTrashView] = useState(false);
       /** Soft-deleted notes, refreshed alongside the live list. */
       const [trashed, setTrashed] = useState([]);
+      /** Narrow windows fold the composer into a one-line entry. */
+      const [narrow, setNarrow] = useState(false);
+      const [composerOpen, setComposerOpen] = useState(true);
       const [query, setQuery] = useState('');
       const [confirmId, setConfirmId] = useState(null);
       const [dragging, setDragging] = useState(false);
@@ -1471,13 +1487,14 @@ window.__ModuleLoader__.load({
         return () => window.clearTimeout(timer);
       }, [notice]);
 
-      // Auto-grow the editor: a compact card that never eats the note list.
+      // Auto-grow the editor: it opens at ~7 lines and grows to just under half
+      // the window, then scrolls internally so the note list stays visible.
       useEffect(() => {
         const element = textareaRef.current;
         if (!element) return;
         element.style.height = 'auto';
-        const max = Math.round(window.innerHeight * 0.42);
-        element.style.height = `${Math.min(element.scrollHeight, max)}px`;
+        const max = Math.round(window.innerHeight * 0.46);
+        element.style.height = Math.min(element.scrollHeight, max) + 'px';
       }, [editor.text, editor.id]);
 
       // Shortcut wake-up: focus the editor now when already mounted, or once the
@@ -1605,6 +1622,7 @@ window.__ModuleLoader__.load({
         setSaveState('idle');
         setPreviewMode(false);
         setTagDraft('');
+        setComposerOpen(true);
         window.setTimeout(() => textareaRef.current?.focus(), 0);
       }, [flush, updateEditor]);
 
@@ -1636,6 +1654,23 @@ window.__ModuleLoader__.load({
         return off;
       }, [focusSearchInput]);
 
+      // Narrow windows fold the composer; it reopens for new notes and edits.
+      useEffect(() => {
+        const query = window.matchMedia('(max-width: 900px)');
+        const apply = () => {
+          setNarrow(query.matches);
+          if (query.matches) {
+            const current = editorRef.current;
+            if (current.text.trim() === '' && current.tags.length === 0 && current.attachments.length === 0) setComposerOpen(false);
+          } else {
+            setComposerOpen(true);
+          }
+        };
+        apply();
+        query.addEventListener('change', apply);
+        return () => query.removeEventListener('change', apply);
+      }, []);
+
       const openNote = useCallback(async (note) => {
         if (editorRef.current.id === note.id) {
           textareaRef.current?.focus();
@@ -1649,6 +1684,7 @@ window.__ModuleLoader__.load({
         baseRef.current = note.updatedAt;
         setSaveState('saved');
         setTagDraft('');
+        setComposerOpen(true);
         textareaRef.current?.focus();
       }, [flush, updateEditor]);
 
@@ -1949,216 +1985,230 @@ window.__ModuleLoader__.load({
                 onClick: () => { void startDraft(); },
               }, h(PlusIcon, null), t('panel.new')))),
 
-          h('section', {
-            className: 'dsh-sp__editor',
-            'data-drag': dragging ? 'true' : 'false',
-          },
-          previewMode
-            ? h('div', {
-              className: 'dsh-sp__preview',
-              role: 'region',
-              'aria-label': t('editor.preview'),
-            }, editor.text.trim() === ''
-              ? h('span', { className: 'dsh-sp__previewEmpty' }, t('editor.emptyPreview'))
-              : renderMarkdown(editor.text, toggleTask, t('editor.task')))
-            : h('textarea', {
-              ref: textareaRef,
-              className: 'dsh-sp__textarea',
-              value: editor.text,
-              placeholder: t('editor.placeholder'),
-              'aria-label': t('panel.title'),
-              spellCheck: false,
-              onChange: onTextChange,
-              onPaste,
-              onClick: onEditorClick,
-              onKeyDown: onEditorKeyDown,
-              onBlur: () => { void flush(); },
-            }),
-          editor.attachments.length > 0 ? h('div', { className: 'dsh-sp__tiles' },
-            editor.attachments.map((attachment) => h(AttachmentTile, {
-              key: attachment.id,
-              attachment,
-              t,
-              onRemove: removeAttachment,
-              onOpen: setPreview,
-            }))) : null,
-          h('div', { className: 'dsh-sp__tags' },
-            editor.tags.map((tag) => h('span', { key: `tag-${tag}`, className: 'dsh-sp__tag' },
-              tag,
-              h('button', {
-                type: 'button',
-                className: 'dsh-sp__tagRemove',
-                'aria-label': `${t('tags.remove')}: ${tag}`,
-                title: t('tags.remove'),
-                onClick: () => removeTag(tag),
-              }, '×'))),
-            h('input', {
-              className: 'dsh-sp__tagInput',
-              value: tagDraft,
-              placeholder: t('tags.add'),
-              'aria-label': t('tags.add'),
-              list: 'dsh-scratchpad-tag-options',
-              onChange: (event) => setTagDraft(event.target.value),
-              onKeyDown: (event) => {
-                if (event.key === 'Enter' || event.key === ',') {
-                  event.preventDefault();
-                  commitTag();
-                } else if (event.key === 'Backspace' && tagDraft === '' && editor.tags.length > 0) {
-                  removeTag(editor.tags[editor.tags.length - 1]);
-                }
-              },
-            }),
-            h('datalist', { id: 'dsh-scratchpad-tag-options' },
-              allTags.map(([tag]) => h('option', { key: tag, value: tag })))),
-          h('div', { className: 'dsh-sp__bar' },
-            h('button', {
-              type: 'button',
-              className: 'dsh-sp__iconBtn',
-              title: previewMode ? t('editor.edit') : t('editor.preview'),
-              'aria-pressed': previewMode ? 'true' : 'false',
-              onClick: () => setPreviewMode((value) => !value),
-            }, previewMode ? t('editor.edit') : t('editor.preview')),
-            h('button', {
-              type: 'button',
-              className: 'dsh-sp__iconBtn',
-              title: t('editor.image'),
-              onClick: () => imageInputRef.current?.click(),
-            }, h(ImageIcon, null), t('editor.image')),
-            h('button', {
-              type: 'button',
-              className: 'dsh-sp__iconBtn',
-              title: t('editor.file'),
-              onClick: () => fileInputRef.current?.click(),
-            }, h(FileIcon, null), t('editor.file')),
-            h('button', {
-              type: 'button',
-              className: 'dsh-sp__iconBtn',
-              title: t('editor.send'),
-              disabled: editor.text.trim() === '' && editor.attachments.length === 0,
-              onClick: () => sendToChat(editor),
-            }, h(SendIcon, null), t('editor.send')),
-            h('span', { className: 'dsh-sp__barSpacer' }),
-            h('span', { className: 'dsh-sp__status', 'data-error': saveState === 'error' ? 'true' : 'false' },
-              `${t('editor.chars')} ${editor.text.length}${statusLabel ? ` · ${statusLabel}` : ''}`)),
-          notice ? h('div', { className: 'dsh-sp__notice', role: 'status' }, notice) : null,
-          conflict ? h('div', { className: 'dsh-sp__conflict', role: 'alert' },
-            h('span', null, t('editor.conflict')),
-            h('button', {
-              type: 'button',
-              className: 'dsh-sp__textBtn',
-              onClick: resolveOverwrite,
-            }, t('editor.conflictOverwrite')),
-            h('button', {
-              type: 'button',
-              className: 'dsh-sp__textBtn',
-              onClick: resolveAdopt,
-            }, t('editor.conflictAdopt'))) : null,
-          h('input', {
-            ref: imageInputRef,
-            type: 'file',
-            accept: 'image/*',
-            multiple: true,
-            hidden: true,
-            onChange: (event) => {
-              void addFiles(event.target.files);
-              event.target.value = '';
-            },
-          }),
-          h('input', {
-            ref: fileInputRef,
-            type: 'file',
-            multiple: true,
-            hidden: true,
-            onChange: (event) => {
-              void addFiles(event.target.files);
-              event.target.value = '';
-            },
-          }),
-          h('input', {
-            ref: importInputRef,
-            type: 'file',
-            accept: 'application/json,.json',
-            hidden: true,
-            onChange: (event) => {
-              void importBackup(event.target.files);
-              event.target.value = '';
-            },
-          })),
-
-          loadError
-            ? h('div', { className: 'dsh-sp__notice', role: 'alert' },
-              `${t('panel.loadError')}${loadErrorMessage ? ` (${loadErrorMessage})` : ''}`)
-            : null,
-
-          !ready
-            ? h('div', { className: 'dsh-sp__empty' }, t('panel.loading'))
-            : h(React.Fragment, null,
-              trash ? h('div', { className: 'dsh-sp__trash', role: 'status' },
-                h('span', null, t('panel.deleted')),
-                h('button', { type: 'button', className: 'dsh-sp__textBtn', onClick: undoDelete }, t('panel.undo'))) : null,
-              h('div', { className: 'dsh-sp__listHeader' },
-                h('span', null, trashView ? t('trash.title') : t('panel.listTitle')),
-                h('span', null, String(trashView ? trashed.length : visibleNotes.length)),
-                h('span', { className: 'dsh-sp__barSpacer' }),
-                trashView ? null : h('a', {
-                  className: 'dsh-sp__textBtn',
-                  href: API + '/export?attachments=1',
-                  title: t('data.exportHint'),
-                }, t('data.export')),
-                trashView ? null : h('button', {
+          h('div', { className: 'dsh-sp__cols' },
+            trashView ? null : h('div', { className: 'dsh-sp__composerCol' },
+              narrow && !composerOpen
+                ? h('button', {
                   type: 'button',
-                  className: 'dsh-sp__textBtn',
-                  title: t('data.importHint'),
-                  disabled: importing,
-                  onClick: () => importInputRef.current?.click(),
-                }, importing ? t('data.importing') : t('data.import')),
-                h('button', {
-                  type: 'button',
-                  className: 'dsh-sp__textBtn',
-                  onClick: () => setTrashView(!trashView),
-                }, trashView ? t('trash.back') : t('trash.title') + ' ' + trashed.length)),
-              allTags.length > 0 ? h('div', {
-                className: 'dsh-sp__filters',
-                role: 'group',
-                'aria-label': t('tags.filter'),
-              },
-              h('button', {
-                type: 'button',
-                className: 'dsh-sp__filter',
-                'data-active': selectedTag === '' ? 'true' : 'false',
-                onClick: () => setSelectedTag(''),
-              }, `${t('tags.all')} ${notes.length}`),
-              allTags.map(([tag, count]) => h('button', {
-                key: tag,
-                type: 'button',
-                className: 'dsh-sp__filter',
-                'data-active': selectedTag === tag ? 'true' : 'false',
-                onClick: () => setSelectedTag(selectedTag === tag ? '' : tag),
-              }, `${tag} ${count}`))) : null,
-              (trashView ? trashed.length === 0 : visibleNotes.length === 0)
-                ? h('div', { className: 'dsh-sp__empty' },
-                  h('span', { className: 'dsh-sp__emptyIcon' }, h(EmptyIcon, null)),
-                  h('span', null, trashView ? t('trash.empty') : query.trim() ? t('panel.noResults') : t('panel.empty')))
-                : h('div', { className: 'dsh-sp__list' },
-                  trashView
-                    ? trashed.map((note) => h(TrashCard, {
-                      key: note.id,
-                      note,
-                      t,
-                      onRestore: restoreNote,
-                      onDeleteForever: deleteForever,
-                    }))
-                    : visibleNotes.map((note) => h(NoteCard, {
-                    key: note.id,
-                    note,
-                    active: editor.id === note.id,
-                    confirming: confirmId === note.id,
+                  className: 'dsh-sp__composerFold',
+                  onClick: () => setComposerOpen(true),
+                }, h(PlusIcon, null), t('editor.foldNew'), hint ? h('span', { className: 'dsh-sp__kbd' }, hint) : null)
+                : h('section', {
+                  className: 'dsh-sp__editor',
+                  'data-drag': dragging ? 'true' : 'false',
+                },
+                h('div', { className: 'dsh-sp__bar' },
+                  h('button', {
+                    type: 'button',
+                    className: 'dsh-sp__iconBtn',
+                    title: previewMode ? t('editor.edit') : t('editor.preview'),
+                    'aria-pressed': previewMode ? 'true' : 'false',
+                    onClick: () => setPreviewMode((value) => !value),
+                  }, previewMode ? t('editor.edit') : t('editor.preview')),
+                  h('button', {
+                    type: 'button',
+                    className: 'dsh-sp__iconBtn',
+                    title: t('editor.image'),
+                    onClick: () => imageInputRef.current?.click(),
+                  }, h(ImageIcon, null), t('editor.image')),
+                  h('button', {
+                    type: 'button',
+                    className: 'dsh-sp__iconBtn',
+                    title: t('editor.file'),
+                    onClick: () => fileInputRef.current?.click(),
+                  }, h(FileIcon, null), t('editor.file')),
+                  h('button', {
+                    type: 'button',
+                    className: 'dsh-sp__iconBtn',
+                    title: t('editor.send'),
+                    disabled: editor.text.trim() === '' && editor.attachments.length === 0,
+                    onClick: () => sendToChat(editor),
+                  }, h(SendIcon, null), t('editor.send'))),
+                previewMode
+                  ? h('div', {
+                    className: 'dsh-sp__preview',
+                    role: 'region',
+                    'aria-label': t('editor.preview'),
+                  }, editor.text.trim() === ''
+                    ? h('span', { className: 'dsh-sp__previewEmpty' }, t('editor.emptyPreview'))
+                    : renderMarkdown(editor.text, toggleTask, t('editor.task')))
+                  : h('textarea', {
+                    ref: textareaRef,
+                    className: 'dsh-sp__textarea',
+                    value: editor.text,
+                    placeholder: t('editor.placeholder'),
+                    'aria-label': t('panel.title'),
+                    spellCheck: false,
+                    onChange: onTextChange,
+                    onPaste,
+                    onClick: onEditorClick,
+                    onKeyDown: onEditorKeyDown,
+                    onBlur: () => { void flush(); },
+                  }),
+                editor.attachments.length > 0 ? h('div', { className: 'dsh-sp__tiles' },
+                  editor.attachments.map((attachment) => h(AttachmentTile, {
+                    key: attachment.id,
+                    attachment,
                     t,
-                    onOpen: (target) => { void openNote(target); },
-                    onTogglePin: togglePin,
-                    onRequestDelete: requestDelete,
-                    onSend: sendToChat,
-                  }))))),
+                    onRemove: removeAttachment,
+                    onOpen: setPreview,
+                  }))) : null,
+                h('div', { className: 'dsh-sp__tags' },
+                  editor.tags.map((tag) => h('span', { key: 'tag-' + tag, className: 'dsh-sp__tag' },
+                    tag,
+                    h('button', {
+                      type: 'button',
+                      className: 'dsh-sp__tagRemove',
+                      'aria-label': t('tags.remove') + ': ' + tag,
+                      title: t('tags.remove'),
+                      onClick: () => removeTag(tag),
+                    }, '×'))),
+                  h('input', {
+                    className: 'dsh-sp__tagInput',
+                    value: tagDraft,
+                    placeholder: t('tags.add'),
+                    'aria-label': t('tags.add'),
+                    list: 'dsh-scratchpad-tag-options',
+                    onChange: (event) => setTagDraft(event.target.value),
+                    onKeyDown: (event) => {
+                      if (event.key === 'Enter' || event.key === ',') {
+                        event.preventDefault();
+                        commitTag();
+                      } else if (event.key === 'Backspace' && tagDraft === '' && editor.tags.length > 0) {
+                        removeTag(editor.tags[editor.tags.length - 1]);
+                      }
+                    },
+                  }),
+                  h('datalist', { id: 'dsh-scratchpad-tag-options' },
+                    allTags.map(([tag]) => h('option', { key: tag, value: tag })))),
+                h('div', { className: 'dsh-sp__bar' },
+                  h('span', { className: 'dsh-sp__status', 'data-error': saveState === 'error' ? 'true' : 'false' },
+                    t('editor.chars') + ' ' + editor.text.length + (statusLabel ? ' · ' + statusLabel : '')),
+                  h('span', { className: 'dsh-sp__barSpacer' }),
+                  h('button', {
+                    type: 'button',
+                    className: 'dsh-sp__new',
+                    title: t('editor.jotHint'),
+                    onClick: () => { void startDraft(); },
+                  }, t('editor.jot'))),
+                notice ? h('div', { className: 'dsh-sp__notice', role: 'status' }, notice) : null,
+                conflict ? h('div', { className: 'dsh-sp__conflict', role: 'alert' },
+                  h('span', null, t('editor.conflict')),
+                  h('button', {
+                    type: 'button',
+                    className: 'dsh-sp__textBtn',
+                    onClick: resolveOverwrite,
+                  }, t('editor.conflictOverwrite')),
+                  h('button', {
+                    type: 'button',
+                    className: 'dsh-sp__textBtn',
+                    onClick: resolveAdopt,
+                  }, t('editor.conflictAdopt'))) : null,
+                h('input', {
+                  ref: imageInputRef,
+                  type: 'file',
+                  accept: 'image/*',
+                  multiple: true,
+                  hidden: true,
+                  onChange: (event) => {
+                    void addFiles(event.target.files);
+                    event.target.value = '';
+                  },
+                }),
+                h('input', {
+                  ref: fileInputRef,
+                  type: 'file',
+                  multiple: true,
+                  hidden: true,
+                  onChange: (event) => {
+                    void addFiles(event.target.files);
+                    event.target.value = '';
+                  },
+                }))),
+            h('div', { className: 'dsh-sp__feedCol' },
+              loadError
+                ? h('div', { className: 'dsh-sp__notice', role: 'alert' },
+                  t('panel.loadError') + (loadErrorMessage ? ' (' + loadErrorMessage + ')' : ''))
+                : null,
+              !ready
+                ? h('div', { className: 'dsh-sp__empty' }, t('panel.loading'))
+                : h(React.Fragment, null,
+                  trash ? h('div', { className: 'dsh-sp__trash', role: 'status' },
+                    h('span', null, t('panel.deleted')),
+                    h('button', { type: 'button', className: 'dsh-sp__textBtn', onClick: undoDelete }, t('panel.undo'))) : null,
+                  h('div', { className: 'dsh-sp__listHeader' },
+                    h('span', null, trashView ? t('trash.title') : t('panel.listTitle')),
+                    h('span', null, String(trashView ? trashed.length : visibleNotes.length)),
+                    h('span', { className: 'dsh-sp__barSpacer' }),
+                    trashView ? null : h('a', {
+                      className: 'dsh-sp__textBtn',
+                      href: API + '/export?attachments=1',
+                      title: t('data.exportHint'),
+                    }, t('data.export')),
+                    trashView ? null : h('button', {
+                      type: 'button',
+                      className: 'dsh-sp__textBtn',
+                      title: t('data.importHint'),
+                      disabled: importing,
+                      onClick: () => importInputRef.current?.click(),
+                    }, importing ? t('data.importing') : t('data.import')),
+                    h('button', {
+                      type: 'button',
+                      className: 'dsh-sp__textBtn',
+                      onClick: () => setTrashView(!trashView),
+                    }, trashView ? t('trash.back') : t('trash.title') + ' ' + trashed.length)),
+                  allTags.length > 0 ? h('div', {
+                    className: 'dsh-sp__filters',
+                    role: 'group',
+                    'aria-label': t('tags.filter'),
+                  },
+                  h('button', {
+                    type: 'button',
+                    className: 'dsh-sp__filter',
+                    'data-active': selectedTag === '' ? 'true' : 'false',
+                    onClick: () => setSelectedTag(''),
+                  }, t('tags.all') + ' ' + notes.length),
+                  allTags.map(([tag, count]) => h('button', {
+                    key: tag,
+                    type: 'button',
+                    className: 'dsh-sp__filter',
+                    'data-active': selectedTag === tag ? 'true' : 'false',
+                    onClick: () => setSelectedTag(selectedTag === tag ? '' : tag),
+                  }, tag + ' ' + count))) : null,
+                  h('input', {
+                    ref: importInputRef,
+                    type: 'file',
+                    accept: 'application/json,.json',
+                    hidden: true,
+                    onChange: (event) => {
+                      void importBackup(event.target.files);
+                      event.target.value = '';
+                    },
+                  }),
+                  (trashView ? trashed.length === 0 : visibleNotes.length === 0)
+                    ? h('div', { className: 'dsh-sp__empty' },
+                      h('span', { className: 'dsh-sp__emptyIcon' }, h(EmptyIcon, null)),
+                      h('span', null, trashView ? t('trash.empty') : query.trim() ? t('panel.noResults') : t('panel.empty')))
+                    : h('div', { className: 'dsh-sp__list' },
+                      trashView
+                        ? trashed.map((note) => h(TrashCard, {
+                          key: note.id,
+                          note,
+                          t,
+                          onRestore: restoreNote,
+                          onDeleteForever: deleteForever,
+                        }))
+                        : visibleNotes.map((note) => h(NoteCard, {
+                        key: note.id,
+                        note,
+                        active: editor.id === note.id,
+                        confirming: confirmId === note.id,
+                        t,
+                        onOpen: (target) => { void openNote(target); },
+                        onTogglePin: togglePin,
+                        onRequestDelete: requestDelete,
+                        onSend: sendToChat,
+                      }))))))),
         preview ? h(Lightbox, { attachment: preview, t, onClose: () => setPreview(null) }) : null);
     }
 
