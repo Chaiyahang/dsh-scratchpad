@@ -72,6 +72,10 @@ window.__ModuleLoader__.load({
         'note.delete': 'Delete note',
         'note.confirmDelete': 'Sure?',
         'note.untitled': 'Empty note',
+        'note.pinnedFlag': 'Pinned',
+        'group.pinned': 'Pinned',
+        'group.today': 'Today',
+        'group.yesterday': 'Yesterday',
         'note.open': 'Open note',
         'note.send': 'Send to conversation',
         'note.attachments': 'Attachments',
@@ -143,6 +147,10 @@ window.__ModuleLoader__.load({
         'note.delete': '删除便签',
         'note.confirmDelete': '确认？',
         'note.untitled': '空白便签',
+        'note.pinnedFlag': '置顶',
+        'group.pinned': '置顶',
+        'group.today': '今天',
+        'group.yesterday': '昨天',
         'note.open': '打开便签',
         'note.send': '发送到对话',
         'note.attachments': '附件',
@@ -177,7 +185,7 @@ window.__ModuleLoader__.load({
     const CSS = `
     .dsh-sp{display:flex;justify-content:center;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-family:inherit}
     .dsh-sp__cols{display:flex;gap:16px;flex:1;min-height:0}
-    .dsh-sp__composerCol{flex:0 0 380px;display:flex;flex-direction:column;gap:10px;min-width:0}
+    .dsh-sp__composerCol{flex:0 0 380px;display:flex;flex-direction:column;gap:10px;min-width:0;padding-bottom:20px}
     .dsh-sp__composerCol .dsh-sp__editor{flex:1;min-height:0}
     .dsh-sp__feedCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0}
     .dsh-sp__composerFold{display:flex;align-items:center;gap:8px;width:100%;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:12px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
@@ -271,7 +279,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__note{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:9px 12px 10px;transition:border-color .12s ease}
 .dsh-sp__note:hover{border-color:light-dark(#3574f0,#7da4ff)}
 .dsh-sp__note--pinned{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
-.dsh-sp__pinnedFlag{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:light-dark(#3574f0,#7da4ff)}
+    .dsh-sp__pinnedFlag{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:light-dark(#3574f0,#7da4ff);margin-right:auto}
 .dsh-sp__noteTools{display:flex;align-items:center;gap:2px;visibility:hidden}
 .dsh-sp__note:hover .dsh-sp__noteTools,.dsh-sp__note:focus-within .dsh-sp__noteTools{visibility:visible}
 @media (hover:none){.dsh-sp__noteTools{visibility:visible}}
