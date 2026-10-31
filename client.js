@@ -172,7 +172,7 @@ window.__ModuleLoader__.load({
     .dsh-sp{display:flex;justify-content:center;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-family:inherit}
     .dsh-sp__cols{display:flex;gap:16px;flex:1;min-height:0}
     .dsh-sp__composerCol{flex:0 0 380px;display:flex;flex-direction:column;gap:10px;min-width:0}
-    .dsh-sp__composerCol .dsh-sp__editor{flex:none}
+    .dsh-sp__composerCol .dsh-sp__editor{flex:1;min-height:0}
     .dsh-sp__feedCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0}
     .dsh-sp__composerFold{display:flex;align-items:center;gap:8px;width:100%;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:12px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
     .dsh-sp__composerFold:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
@@ -200,8 +200,8 @@ window.__ModuleLoader__.load({
 .dsh-sp__editor{flex:none;display:flex;flex-direction:column;gap:10px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:12px 14px;transition:border-color .12s ease}
 .dsh-sp__editor:focus-within{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__editor[data-drag="true"]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
-    .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;min-height:180px;max-height:46vh;overflow-y:auto;padding:0;display:block}
-    .dsh-sp__preview{width:100%;box-sizing:border-box;min-height:180px;max-height:46vh;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
+    .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;flex:1 1 auto;min-height:180px;overflow-y:auto;padding:0;display:block}
+    .dsh-sp__preview{width:100%;box-sizing:border-box;flex:1 1 auto;min-height:180px;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
 .dsh-sp__previewEmpty{font-size:13px;color:var(--dsw-alias-label-secondary)}
 .dsh-sp__mdH{margin:2px 0 6px;line-height:1.35;color:var(--dsw-alias-label-primary);font-weight:600}
 .dsh-sp__mdH1{font-size:16px}
@@ -1495,16 +1495,6 @@ window.__ModuleLoader__.load({
         const timer = window.setTimeout(() => setNotice(''), 5000);
         return () => window.clearTimeout(timer);
       }, [notice]);
-
-      // Auto-grow the editor: it opens at ~7 lines and grows to just under half
-      // the window, then scrolls internally so the note list stays visible.
-      useEffect(() => {
-        const element = textareaRef.current;
-        if (!element) return;
-        element.style.height = 'auto';
-        const max = Math.round(window.innerHeight * 0.46);
-        element.style.height = Math.min(element.scrollHeight, max) + 'px';
-      }, [editor.text, editor.id]);
 
       // Shortcut wake-up: focus the editor now when already mounted, or once the
       // freshly selected panel has rendered.
