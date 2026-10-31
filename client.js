@@ -44,7 +44,7 @@ window.__ModuleLoader__.load({
         'panel.deleted': 'Note deleted — kept for 7 days.',
         'panel.undo': 'Undo',
         'panel.updatedElsewhere': 'This note was just updated in another window or by the Agent.',
-        'panel.localData': 'Notes are stored locally in ~/.dsh/scratchpad/ — never sent over the network.',
+        'panel.localData': 'Notes stored locally in ~/.dsh/scratchpad/.',
         'trash.title': 'Trash',
         'trash.back': 'Back to notes',
         'trash.empty': 'Trash is empty.',
@@ -83,6 +83,9 @@ window.__ModuleLoader__.load({
         'shortcut.open': 'Open scratchpad',
         'shortcut.new': 'New note',
         'shortcut.search': 'Search notes',
+        'shortcut.openShort': 'Open',
+        'shortcut.newShort': 'New',
+        'shortcut.searchShort': 'Search',
         'data.export': 'Export',
         'data.exportHint': 'Download every note, attachments included, as one JSON file.',
         'data.import': 'Import',
@@ -112,7 +115,7 @@ window.__ModuleLoader__.load({
         'panel.deleted': '便签已删除，7 天内可恢复。',
         'panel.undo': '撤销',
         'panel.updatedElsewhere': '此便签刚被其他窗口或 Agent 更新。',
-        'panel.localData': '数据保存在本机 ~/.dsh/scratchpad/，不经过外部网络。',
+        'panel.localData': '数据在本机 ~/.dsh/scratchpad/。',
         'trash.title': '回收站',
         'trash.back': '返回便签',
         'trash.empty': '回收站是空的。',
@@ -151,6 +154,9 @@ window.__ModuleLoader__.load({
         'shortcut.open': '打开便签',
         'shortcut.new': '新建便签',
         'shortcut.search': '搜索便签',
+        'shortcut.openShort': '打开',
+        'shortcut.newShort': '新建',
+        'shortcut.searchShort': '搜索',
         'data.export': '导出',
         'data.exportHint': '把全部便签（含附件）导出为一个 JSON 文件。',
         'data.import': '导入',
@@ -216,7 +222,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__mdTaskText[data-done="true"]{color:var(--dsw-alias-label-secondary);text-decoration:line-through}
 .dsh-sp__mdPre{margin:0 0 8px;padding:8px 10px;background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;overflow-x:auto;font-size:12px;line-height:1.55}
 .dsh-sp__mdCode{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--dsw-alias-bg-layer-2);border-radius:4px;padding:0 4px}
-.dsh-sp__mdLink{color:var(--dsw-alias-brand-primary);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
+.dsh-sp__mdLink{color:light-dark(#3574f0,#7da4ff);text-decoration:underline;text-underline-offset:2px;word-break:break-all}
 .dsh-sp__mdLink:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .dsh-sp__mdQuote{margin:0 0 6px;padding-left:10px;border-left:2px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary)}
 .dsh-sp__tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:24px}
@@ -259,11 +265,16 @@ window.__ModuleLoader__.load({
 .dsh-sp__list{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 0 20px}
     .dsh-sp__listHeader{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding-top:2px}
     .dsh-sp__toolbar{background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:8px}
-    .dsh-sp__about{background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--dsw-alias-label-secondary)}
+    .dsh-sp__about{background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;padding:8px 12px;display:flex;flex-direction:row;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:11.5px;color:var(--dsw-alias-label-secondary)}
     .dsh-sp__aboutRow{display:flex;align-items:center;gap:8px}
     .dsh-sp__aboutNote{margin-top:2px;word-break:break-all}
 .dsh-sp__note{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:9px 12px 10px;transition:border-color .12s ease}
-.dsh-sp__note:hover{border-color:var(--dsw-alias-border-l2)}
+.dsh-sp__note:hover{border-color:light-dark(#3574f0,#7da4ff)}
+.dsh-sp__note--pinned{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
+.dsh-sp__pinnedFlag{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:light-dark(#3574f0,#7da4ff)}
+.dsh-sp__noteTools{display:flex;align-items:center;gap:2px;visibility:hidden}
+.dsh-sp__note:hover .dsh-sp__noteTools,.dsh-sp__note:focus-within .dsh-sp__noteTools{visibility:visible}
+@media (hover:none){.dsh-sp__noteTools{visibility:visible}}
 .dsh-sp__note[data-active="true"]{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__noteTop{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;min-height:24px}
 .dsh-sp__noteTime{font-size:11.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
@@ -1174,9 +1185,10 @@ window.__ModuleLoader__.load({
 
     function NoteCard({ note, active, confirming, t, onOpen, onTogglePin, onRequestDelete, onSend }) {
       const preview = toPlainExcerpt(note.text).trim();
-      return h('article', { className: 'dsh-sp__note', 'data-active': active ? 'true' : 'false' },
+      return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false' },
         h('div', { className: 'dsh-sp__noteTop' },
           h('time', { className: 'dsh-sp__noteTime', dateTime: new Date(note.updatedAt).toISOString() }, formatTime(note.updatedAt)),
+          note.pinned ? h('span', { className: 'dsh-sp__pinnedFlag' }, t('note.pinnedFlag')) : null,
           h('div', { className: 'dsh-sp__noteTools' },
             h('button', {
               type: 'button',
@@ -2097,11 +2109,11 @@ window.__ModuleLoader__.load({
 
       const aboutCard = h('div', { className: 'dsh-sp__about' },
         h('div', { className: 'dsh-sp__aboutRow' },
-          h('kbd', { className: 'dsh-sp__kbd' }, hint || '⌘⇧S'), h('span', null, t('shortcut.open'))),
+          h('kbd', { className: 'dsh-sp__kbd' }, hint || '⌘⇧S'), h('span', null, t('shortcut.openShort'))),
         h('div', { className: 'dsh-sp__aboutRow' },
-          h('kbd', { className: 'dsh-sp__kbd' }, newKbd || '⌘⇧N'), h('span', null, t('panel.new'))),
+          h('kbd', { className: 'dsh-sp__kbd' }, newKbd || '⌘⇧N'), h('span', null, t('shortcut.newShort'))),
         h('div', { className: 'dsh-sp__aboutRow' },
-          h('kbd', { className: 'dsh-sp__kbd' }, searchKbd || '⌘⇧F'), h('span', null, t('panel.search'))),
+          h('kbd', { className: 'dsh-sp__kbd' }, searchKbd || '⌘⇧F'), h('span', null, t('shortcut.searchShort'))),
         h('div', { className: 'dsh-sp__aboutRow' },
           h('kbd', { className: 'dsh-sp__kbd' }, isMacPlatform() ? '⌘↵' : 'Ctrl+↵'), h('span', null, t('editor.jot'))),
         h('div', { className: 'dsh-sp__aboutNote' }, t('panel.localData')));
