@@ -193,7 +193,8 @@ window.__ModuleLoader__.load({
     .dsh-sp__cols{display:flex;gap:16px;flex:1;min-height:0}
     .dsh-sp__composerCol{flex:0 0 380px;display:flex;flex-direction:column;gap:10px;min-width:0;padding-bottom:20px}
     .dsh-sp__composerCol .dsh-sp__editor{flex:1;min-height:0}
-    .dsh-sp__feedCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;padding-bottom:20px}
+    .dsh-sp__feedCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0}
+    .dsh-sp__listScroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 0 20px}
     .dsh-sp__composerFold{display:flex;align-items:center;gap:8px;width:100%;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:12px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
     .dsh-sp__composerFold:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
     @media (max-width:900px){.dsh-sp__cols{flex-direction:column}.dsh-sp__composerCol{flex:none;width:auto}}
@@ -276,7 +277,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__notice{flex:none;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsh-sp__conflict{flex:none;display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary)}
 .dsh-sp__trash{flex:none;display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
-.dsh-sp__list{display:flex;flex-direction:column;gap:10px;padding:2px 0 20px}
+.dsh-sp__list{display:flex;flex-direction:column;gap:10px}
     .dsh-sp__listHeader{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding-top:2px}
     .dsh-sp__toolbar{background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:8px}
     .dsh-sp__about{background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;padding:8px 12px;display:flex;flex-direction:row;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:11.5px;color:var(--dsw-alias-label-secondary)}
@@ -2199,12 +2200,13 @@ window.__ModuleLoader__.load({
           },
         }));
         const listEmpty = (trashView ? trashed.length === 0 : visibleNotes.length === 0);
+        const listArea = [];
         if (listEmpty) {
-          feedChildren.push(h('div', { className: 'dsh-sp__empty' },
+          listArea.push(h('div', { className: 'dsh-sp__empty' },
             h('span', { className: 'dsh-sp__emptyIcon' }, h(EmptyIcon, null)),
             h('span', null, trashView ? t('trash.empty') : query.trim() ? t('panel.noResults') : t('panel.empty'))));
         } else if (trashView) {
-          feedChildren.push(h('div', { className: 'dsh-sp__list' },
+          listArea.push(h('div', { className: 'dsh-sp__list' },
             trashed.map((note) => h(TrashCard, {
               key: note.id,
               note,
@@ -2237,8 +2239,8 @@ window.__ModuleLoader__.load({
             bucket.cards.push(note);
           }
           for (const section of sections) {
-            feedChildren.push(h('div', { className: 'dsh-sp__groupHead' }, section.label));
-            feedChildren.push(h('div', { className: 'dsh-sp__list' },
+            listArea.push(h('div', { className: 'dsh-sp__groupHead' }, section.label));
+            listArea.push(h('div', { className: 'dsh-sp__list' },
               section.cards.map((note) => h(NoteCard, {
                 key: note.id,
                 note,
@@ -2252,6 +2254,7 @@ window.__ModuleLoader__.load({
               }))));
           }
         }
+        feedChildren.push(h('div', { className: 'dsh-sp__listScroll' }, listArea));
       }
 
       return h('div', { className: 'dsh-sp', onDrop, onDragOver, onDragLeave },
