@@ -284,8 +284,8 @@ window.__ModuleLoader__.load({
       return body;
     }
 
-    async function fetchSnapshot() {
-      return apiJson(`${API}/notes`);
+    async function fetchSnapshot(since) {
+      return apiJson(since > 0 ? API + '/notes?since=' + since : API + '/notes');
     }
 
     /**
@@ -309,8 +309,8 @@ window.__ModuleLoader__.load({
       });
     }
 
-    async function fetchTrashList() {
-      return apiJson(API + '/notes?view=trash');
+    async function fetchTrashList(since) {
+      return apiJson(since > 0 ? API + '/notes?view=trash&since=' + since : API + '/notes?view=trash');
     }
 
     async function uploadAttachment(file) {
@@ -1267,6 +1267,8 @@ window.__ModuleLoader__.load({
       const editorRef = useRef(editor);
       /** updatedAt of the version this editor last synced with the Host; 0 = no base. */
       const baseRef = useRef(0);
+      /** Store revision this panel last applied; drives conditional polls. */
+      const revisionRef = useRef(0);
       const pendingRef = useRef(null);
       const dirtyRef = useRef(false);
       const timerRef = useRef(0);
@@ -1314,6 +1316,7 @@ window.__ModuleLoader__.load({
           const body = await saveNoteRemote(note, baseRef.current || undefined);
           applyToNotes(body.note);
           baseRef.current = body.note.updatedAt;
+          revisionRef.current = Math.max(revisionRef.current, body.revision || 0);
           if (!pendingRef.current) {
             dirtyRef.current = false;
             window.clearTimeout(draftTimerRef.current);
@@ -1368,6 +1371,7 @@ window.__ModuleLoader__.load({
             if (!alive) return;
             const sorted = sortNotes(snapshot.notes);
             setNotes(sorted);
+            revisionRef.current = snapshot.revision;
             setLoadError(false);
             setLoadErrorMessage('');
             void fetchTrashList().then((result) => {
@@ -1417,10 +1421,13 @@ window.__ModuleLoader__.load({
           if (busy || document.visibilityState !== 'visible') return;
           busy = true;
           try {
-            const [snapshot, trashResult] = await Promise.all([fetchSnapshot(), fetchTrashList()]);
+            const since = revisionRef.current;
+            const [snapshot, trashResult] = await Promise.all([fetchSnapshot(since), fetchTrashList(since)]);
             if (!alive) return;
             setLoadError(false);
             setLoadErrorMessage('');
+            if (snapshot.revision === revisionRef.current) return; // nothing changed anywhere
+            revisionRef.current = snapshot.revision;
             setNotes(sortNotes(snapshot.notes));
             setTrashed(sortByDeleted(trashResult.notes));
             if (pendingRef.current) {
@@ -1660,6 +1667,7 @@ window.__ModuleLoader__.load({
           .then((body) => {
             applyToNotes(body.note);
             baseRef.current = body.note.updatedAt;
+            revisionRef.current = Math.max(revisionRef.current, body.revision || 0);
             dirtyRef.current = false;
             window.clearTimeout(draftTimerRef.current);
             clearDraft();
@@ -1697,6 +1705,7 @@ window.__ModuleLoader__.load({
           try {
             const body = await saveNoteRemote({ ...target, pinned: !target.pinned }, target.updatedAt);
             applyToNotes(body.note);
+            revisionRef.current = Math.max(revisionRef.current, body.revision || 0);
             if (editorRef.current.id === target.id) {
               updateEditor({ ...editorRef.current, pinned: body.note.pinned });
               baseRef.current = body.note.updatedAt;
@@ -1764,6 +1773,7 @@ window.__ModuleLoader__.load({
             applyToNotes(body.note);
             const snapshot = await fetchSnapshot();
             setNotes(sortNotes(snapshot.notes));
+            revisionRef.current = snapshot.revision;
             setTrashed(sortByDeleted((await fetchTrashList()).notes));
             setSaveState('saved');
           } catch (error) {
@@ -1873,6 +1883,7 @@ window.__ModuleLoader__.load({
             baseRef.current = fresh.updatedAt;
             setSaveState('saved');
           }
+          revisionRef.current = snapshot.revision;
           setNotice(t('data.imported'));
         } catch (error) {
           setNotice(`${t('data.importFailed')}: ${error instanceof Error ? error.message : String(error)}`);

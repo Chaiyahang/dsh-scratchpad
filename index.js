@@ -184,6 +184,12 @@ export function apply(ctx) {
     const url = new URL(request.url);
     const trash = url.searchParams.get('view') === 'trash';
     const state = await readState();
+    // Conditional poll: when the client already holds this revision, skip the
+    // payload entirely — one revision covers both the live and trash views.
+    const since = Number(url.searchParams.get('since'));
+    if (Number.isInteger(since) && since === state.revision) {
+      return json({ ok: true, revision: state.revision, unchanged: true, notes: [] });
+    }
     return json({
       ok: true,
       revision: state.revision,

@@ -189,6 +189,18 @@ try {
   assert((await readdir(join(harness.dir, 'scratchpad', 'files'))).length === trashFilesBefore - 1,
     'a permanent delete removes the attachment files');
 
+  // Conditional list: a matching since short-circuits, a stale one returns all.
+  const currentRevision = (await harness.request('GET', '/api/scratchpad/notes')).body.revision;
+  const unchanged = await harness.request('GET', '/api/scratchpad/notes', { query: { since: String(currentRevision) } });
+  assert(unchanged.status === 200 && unchanged.body.unchanged === true && unchanged.body.notes.length === 0,
+    'a matching since answers a short unchanged body');
+  result = await harness.request('POST', '/api/scratchpad/notes', { json: { note: { id: 'since-note', text: 'x', createdAt: 1, updatedAt: 1, attachments: [] } } });
+  const stale = await harness.request('GET', '/api/scratchpad/notes', { query: { since: String(currentRevision) } });
+  assert(stale.body.unchanged === undefined && stale.body.notes.some((item) => item.id === 'since-note'),
+    'a stale since returns the full list with a fresh revision');
+  const trashUnchanged = await harness.request('GET', '/api/scratchpad/notes', { query: { view: 'trash', since: String(stale.body.revision) } });
+  assert(trashUnchanged.body.unchanged === true, 'the trash view honors since too');
+
   console.log('notes test passed');
 } finally {
   await harness.cleanup();
