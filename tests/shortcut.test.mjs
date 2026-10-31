@@ -7,9 +7,9 @@ const end = source.indexOf('    // ---------------------------------------------
 if (start < 0 || end < 0) throw new Error('shortcut markers not found');
 const body = source.slice(start, end);
 
-const build = new Function('t', body + '\nreturn { OPEN_SHORTCUTS, NEW_SHORTCUTS, SEARCH_SHORTCUTS, shortcutCandidates };');
+const build = new Function('t', 'isMacPlatform', body + '\nreturn { OPEN_SHORTCUTS, NEW_SHORTCUTS, SEARCH_SHORTCUTS, shortcutCandidates };');
 const t = (key) => 'L:' + key;
-const { OPEN_SHORTCUTS, NEW_SHORTCUTS, SEARCH_SHORTCUTS, shortcutCandidates } = build(t);
+const { OPEN_SHORTCUTS, NEW_SHORTCUTS, SEARCH_SHORTCUTS, shortcutCandidates } = build(t, () => true);
 
 function assert(condition, message) {
   if (!condition) throw new Error(`assertion failed: ${message}`);
