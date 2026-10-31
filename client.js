@@ -1696,14 +1696,6 @@ window.__ModuleLoader__.load({
       }, [confirmId, flush, updateEditor]);
 
       /** Undo: re-save the stored copy; soft-deleted notes and their files remain. */
-      const undoDelete = useCallback(() => {
-        const restore = trash?.note;
-        window.clearTimeout(trashTimerRef.current);
-        setTrash(null);
-        if (!restore) return;
-        restoreNote(restore);
-      }, [restoreNote, trash]);
-
       /**
        * Bring a soft-deleted note back: re-save it (the Host keeps it until
        * purged), then resync the list from an authoritative snapshot so an
@@ -1723,6 +1715,14 @@ window.__ModuleLoader__.load({
           }
         })();
       }, [applyToNotes]);
+
+      const undoDelete = useCallback(() => {
+        const restore = trash?.note;
+        window.clearTimeout(trashTimerRef.current);
+        setTrash(null);
+        if (!restore) return;
+        restoreNote(restore);
+      }, [restoreNote, trash]);
 
       /** Hard-delete a trashed note and its files right away. */
       const deleteForever = useCallback((note) => {
