@@ -193,8 +193,10 @@ window.__ModuleLoader__.load({
     .dsh-sp__new:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
     .dsh-sp__jotKbd{opacity:.6;margin-left:5px;font-weight:500}
 .dsh-sp__searchGroup{flex:1 1 240px;max-width:300px;min-width:170px;display:flex;align-items:center;gap:6px}
-.dsh-sp__searchGroup .dsh-sp__search{flex:1 1 auto;min-width:0}
-.dsh-sp__newGroup{flex:none;display:flex;align-items:center;gap:6px}
+.dsh-sp__searchWrap{position:relative;flex:1 1 auto;min-width:0}
+.dsh-sp__searchWrap .dsh-sp__search{width:100%}
+.dsh-sp__search--kbd{padding-right:58px}
+.dsh-sp__kbdIn{position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none}
 .dsh-sp__editor{flex:none;display:flex;flex-direction:column;gap:10px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:12px 14px;transition:border-color .12s ease}
 .dsh-sp__editor:focus-within{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__editor[data-drag="true"]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
@@ -2105,6 +2107,8 @@ window.__ModuleLoader__.load({
 
       const aboutCard = h('div', { className: 'dsh-sp__about' },
         h('div', { className: 'dsh-sp__aboutRow' },
+          h('kbd', { className: 'dsh-sp__kbd' }, hint || '⌘⇧S'), h('span', null, t('shortcut.open'))),
+        h('div', { className: 'dsh-sp__aboutRow' },
           h('kbd', { className: 'dsh-sp__kbd' }, newKbd || '⌘⇧N'), h('span', null, t('panel.new'))),
         h('div', { className: 'dsh-sp__aboutRow' },
           h('kbd', { className: 'dsh-sp__kbd' }, searchKbd || '⌘⇧F'), h('span', null, t('panel.search'))),
@@ -2213,23 +2217,25 @@ window.__ModuleLoader__.load({
                 h('span', { className: 'dsh-sp__version', title: t('panel.version') + ' ' + VERSION }, 'v' + VERSION)),
               h('p', { className: 'dsh-sp__subtitle' }, t('panel.subtitle'))),
             h('div', { className: 'dsh-sp__searchGroup' },
-              searchKbd ? h('kbd', { className: 'dsh-sp__kbd', title: t('shortcut.search') }, searchKbd) : null,
-              h('input', {
-                ref: searchInputRef,
-                type: 'search',
-                className: 'dsh-sp__search',
-                value: query,
-                placeholder: t('panel.search'),
-                'aria-label': t('panel.search'),
-                onChange: (event) => setQuery(event.target.value),
-              })),
+              h('div', { className: 'dsh-sp__searchWrap' },
+                h('input', {
+                  ref: searchInputRef,
+                  type: 'search',
+                  className: 'dsh-sp__search' + (searchKbd ? ' dsh-sp__search--kbd' : ''),
+                  value: query,
+                  placeholder: t('panel.search'),
+                  'aria-label': t('panel.search'),
+                  title: searchKbd ? t('shortcut.search') : undefined,
+                  onChange: (event) => setQuery(event.target.value),
+                }),
+                searchKbd ? h('kbd', { className: 'dsh-sp__kbd dsh-sp__kbdIn', title: t('shortcut.search') }, searchKbd) : null)),
             h('div', { className: 'dsh-sp__newGroup' },
               newKbd ? h('kbd', { className: 'dsh-sp__kbd', title: t('shortcut.new') }, newKbd) : null,
               h('button', {
                 type: 'button',
                 className: 'dsh-sp__new',
                 onClick: () => { void startDraft(); },
-              }, h(PlusIcon, null), t('panel.new')))),
+              }, h(PlusIcon, null), t('panel.new'), h('span', { className: 'dsh-sp__jotKbd' }, newKbd || '⌘⇧N')))),
           h('div', { className: 'dsh-sp__cols' },
             trashView ? null : h('div', { className: 'dsh-sp__composerCol' },
               narrow && !composerOpen
