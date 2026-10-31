@@ -278,12 +278,12 @@ window.__ModuleLoader__.load({
     .dsh-sp__aboutNote{margin-top:2px;word-break:break-all}
 .dsh-sp__note{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:9px 12px 10px;transition:border-color .12s ease}
 .dsh-sp__note:hover{border-color:light-dark(#3574f0,#7da4ff)}
-.dsh-sp__note--pinned{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
-    .dsh-sp__pinnedFlag{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:light-dark(#3574f0,#7da4ff);margin-right:auto}
+.dsh-sp__pinnedFlag{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:light-dark(#3574f0,#7da4ff);margin-right:auto}
 .dsh-sp__noteTools{display:flex;align-items:center;gap:2px;visibility:hidden}
 .dsh-sp__note:hover .dsh-sp__noteTools,.dsh-sp__note:focus-within .dsh-sp__noteTools{visibility:visible}
 @media (hover:none){.dsh-sp__noteTools{visibility:visible}}
 .dsh-sp__note[data-active="true"]{border-color:var(--dsw-alias-brand-primary)}
+.dsh-sp__note.dsh-sp__note--pinned,.dsh-sp__note.dsh-sp__note--pinned[data-active="true"]{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
 .dsh-sp__noteTop{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;min-height:24px}
 .dsh-sp__noteTime{font-size:11.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
 .dsh-sp__noteTools{display:flex;align-items:center;gap:2px}
@@ -1196,7 +1196,7 @@ window.__ModuleLoader__.load({
       return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false' },
         h('div', { className: 'dsh-sp__noteTop' },
           h('time', { className: 'dsh-sp__noteTime', dateTime: new Date(note.updatedAt).toISOString() }, formatTime(note.updatedAt)),
-          note.pinned ? h('span', { className: 'dsh-sp__pinnedFlag' }, t('note.pinnedFlag')) : null,
+          note.pinned ? h('span', { className: 'dsh-sp__pinnedFlag' }, h(PinIcon, null), t('note.pinnedFlag')) : null,
           h('div', { className: 'dsh-sp__noteTools' },
             h('button', {
               type: 'button',
