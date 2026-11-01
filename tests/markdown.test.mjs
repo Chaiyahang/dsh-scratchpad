@@ -10,8 +10,8 @@ const slice = (startMarker, endMarker) => {
 };
 
 const createElement = (type, props, ...children) => ({ type, props: props ?? {}, children });
-const build = new Function('h', `${slice('function renderInline', 'function toPlainExcerpt')}; return { renderInline, renderMarkdown };`);
-const { renderInline, renderMarkdown } = build(createElement);
+const build = new Function('h', `${slice('function renderInline', 'function toPlainExcerpt')}; return { renderInline, renderMarkdown, wrapMarkdown };`);
+const { renderInline, renderMarkdown, wrapMarkdown } = build(createElement);
 const excerpt = new Function(`${slice('function toPlainExcerpt', '// ---------------------------------------------------------------------\n    // Focus requests')}; return toPlainExcerpt;`)();
 
 function assert(condition, message) {
@@ -79,5 +79,15 @@ assert(labelled && labelled.props.href === 'https://example.com/x?y=1' && flatte
 const hostile = renderInline('[x](javascript:alert(1)) [y](/relative) z');
 assert(!hostile.some((node) => node.type === 'a'), 'non-http(s)/mailto targets stay literal text');
 assert(renderInline('~~gone~~ kept').some((node) => node.type === 'del'), 'strikethrough renders');
+
+const emptyWrap = wrapMarkdown('abc', 1, 1, '**');
+assert(emptyWrap.text === 'a****bc' && emptyWrap.start === 3 && emptyWrap.end === 3,
+  'an empty selection inserts the marker pair with the caret inside');
+const wrappedSel = wrapMarkdown('abc', 1, 2, '**');
+assert(wrappedSel.text === 'a**b**c' && wrappedSel.start === 3 && wrappedSel.end === 4,
+  'a selection gets wrapped and stays selected');
+const unwrapped = wrapMarkdown('a**b**c', 1, 5, '**');
+assert(unwrapped.text === 'abc' && unwrapped.start === 1 && unwrapped.end === 2,
+  'unwrapping removes the marker pair and keeps the inner selection');
 
 console.log('markdown test passed');

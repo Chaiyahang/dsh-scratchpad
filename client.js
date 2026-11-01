@@ -66,6 +66,11 @@ window.__ModuleLoader__.load({
         'editor.foldNew': 'New note…',
         'editor.jot': 'Jot it down',
         'editor.jotHint': '⌘/Ctrl+Enter — finish this note and start the next',
+        'editor.bold': 'Bold',
+        'editor.italic': 'Italic',
+        'editor.strike': 'Strikethrough',
+        'editor.code': 'Inline code',
+        'editor.mdGroup': 'Markdown formatting',
         'editor.remove': 'Remove attachment',
         'note.pin': 'Pin note',
         'note.unpin': 'Unpin note',
@@ -144,6 +149,11 @@ window.__ModuleLoader__.load({
         'editor.foldNew': '记一条…',
         'editor.jot': '记一下',
         'editor.jotHint': '⌘/Ctrl+Enter · 结束这条并开始下一条',
+        'editor.bold': '加粗',
+        'editor.italic': '斜体',
+        'editor.strike': '删除线',
+        'editor.code': '行内代码',
+        'editor.mdGroup': 'Markdown 格式',
         'editor.remove': '移除附件',
         'note.pin': '置顶',
         'note.unpin': '取消置顶',
@@ -219,7 +229,14 @@ window.__ModuleLoader__.load({
 .dsh-sp__search--kbd{padding-right:58px}
 .dsh-sp__kbdIn{position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none}
 .dsh-sp__editor{flex:none;display:flex;flex-direction:column;gap:10px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:12px 14px;transition:border-color .12s ease}
-.dsh-sp__editor:focus-within{border-color:var(--dsw-alias-brand-primary)}
+    .dsh-sp__editor:focus-within{border-color:var(--dsw-alias-brand-primary)}
+    .dsh-sp__mdGroup{display:inline-flex;align-items:center;gap:2px;background:var(--dsw-alias-bg-layer-2);border-radius:8px;padding:2px}
+    .dsh-sp__mdBtn{min-width:26px;height:24px;border:none;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;cursor:pointer;font-family:inherit;font-size:12.5px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
+    .dsh-sp__mdBtn:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1)}
+    .dsh-sp__mdB{font-weight:700}
+    .dsh-sp__mdI{font-style:italic}
+    .dsh-sp__mdS{text-decoration:line-through}
+    .dsh-sp__mdC{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
 .dsh-sp__editor[data-drag="true"]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
     .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;flex:1 1 auto;min-height:180px;overflow-y:auto;padding:0;display:block}
     .dsh-sp__preview{width:100%;box-sizing:border-box;flex:1 1 auto;min-height:180px;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
@@ -639,6 +656,16 @@ window.__ModuleLoader__.load({
     }
 
     /** One-line-ish card excerpt: markers become glyphs instead of raw syntax. */
+    /** Wrap (or unwrap) a markdown marker around text[start:end]. */
+    function wrapMarkdown(text, start, end, marker) {
+      const selected = text.slice(start, end);
+      if (selected.startsWith(marker) && selected.endsWith(marker) && selected.length >= marker.length * 2) {
+        const inner = selected.slice(marker.length, selected.length - marker.length);
+        return { text: text.slice(0, start) + inner + text.slice(end), start, end: start + inner.length };
+      }
+      return { text: text.slice(0, start) + marker + selected + marker + text.slice(end), start: start + marker.length, end: start + marker.length + selected.length };
+    }
+
     function toPlainExcerpt(text) {
       return String(text).split('\n').map((line) => line
         .replace(/^\s*[-*]\s+\[([ xX])\]\s?/, (_, mark) => (mark.toLowerCase() === 'x' ? '☑ ' : '☐ '))
@@ -1895,12 +1922,35 @@ window.__ModuleLoader__.load({
         setDragging(false);
       }, []);
 
+      /** Wrap the textarea selection in a markdown marker (toolbar / ⌘B / ⌘I). */
+      const wrapSelection = useCallback((marker) => {
+        const element = textareaRef.current;
+        if (!element) return;
+        const start = typeof element.selectionStart === 'number' ? element.selectionStart : element.value.length;
+        const end = typeof element.selectionEnd === 'number' ? element.selectionEnd : start;
+        const result = wrapMarkdown(element.value, start, end, marker);
+        const next = withId({ ...editorRef.current, text: result.text, updatedAt: Date.now() });
+        dirtyRef.current = true;
+        updateEditor(next);
+        queueDraft(next);
+        if (next.id) scheduleSave(next);
+        element.focus();
+        try {
+          element.setSelectionRange(result.start, result.end);
+        } catch {}
+      }, [queueDraft, scheduleSave, updateEditor]);
+
       const onEditorKeyDown = useCallback((event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
           event.preventDefault();
           void startDraft();
+          return;
         }
-      }, [startDraft]);
+        if ((event.metaKey || event.ctrlKey) && (event.key === 'b' || event.key === 'i')) {
+          event.preventDefault();
+          wrapSelection(event.key === 'b' ? '**' : '*');
+        }
+      }, [startDraft, wrapSelection]);
 
       /** ⌘/Ctrl-click opens the URL under the caret without leaving edit mode. */
       const onEditorClick = useCallback((event) => {
@@ -1996,6 +2046,31 @@ window.__ModuleLoader__.load({
           'aria-pressed': previewMode ? 'true' : 'false',
           onClick: () => setPreviewMode((value) => !value),
         }, previewMode ? t('editor.edit') : t('editor.preview')),
+        !previewMode ? h('span', { className: 'dsh-sp__mdGroup', role: 'group', 'aria-label': t('editor.mdGroup') },
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__mdBtn',
+            title: t('editor.bold') + ' (⌘B)',
+            onClick: () => wrapSelection('**'),
+          }, h('span', { className: 'dsh-sp__mdB' }, 'B')),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__mdBtn',
+            title: t('editor.italic') + ' (⌘I)',
+            onClick: () => wrapSelection('*'),
+          }, h('span', { className: 'dsh-sp__mdI' }, 'I')),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__mdBtn',
+            title: t('editor.strike'),
+            onClick: () => wrapSelection('~~'),
+          }, h('span', { className: 'dsh-sp__mdS' }, 'S')),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__mdBtn',
+            title: t('editor.code'),
+            onClick: () => wrapSelection('`'),
+          }, h('span', { className: 'dsh-sp__mdC' }, '</>'))) : null,
         h('button', {
           type: 'button',
           className: 'dsh-sp__iconBtn',
