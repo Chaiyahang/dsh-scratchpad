@@ -86,7 +86,7 @@ assert(emptyWrap.text === 'a****bc' && emptyWrap.start === 3 && emptyWrap.end ==
 const wrappedSel = wrapMarkdown('abc', 1, 2, '**');
 assert(wrappedSel.text === 'a**b**c' && wrappedSel.start === 3 && wrappedSel.end === 4,
   'a selection gets wrapped and stays selected');
-const unwrapped = wrapMarkdown('a**b**c', 1, 5, '**');
+const unwrapped = wrapMarkdown('a**b**c', 1, 6, '**');
 assert(unwrapped.text === 'abc' && unwrapped.start === 1 && unwrapped.end === 2,
   'unwrapping removes the marker pair and keeps the inner selection');
 
