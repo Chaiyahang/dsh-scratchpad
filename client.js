@@ -231,12 +231,9 @@ window.__ModuleLoader__.load({
 .dsh-sp__editor{flex:none;display:flex;flex-direction:column;gap:10px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:12px 14px;transition:border-color .12s ease}
     .dsh-sp__editor:focus-within{border-color:var(--dsw-alias-brand-primary)}
     .dsh-sp__mdGroup{display:inline-flex;align-items:center;gap:2px;background:var(--dsw-alias-bg-layer-2);border-radius:8px;padding:2px}
-    .dsh-sp__mdBtn{min-width:26px;height:24px;border:none;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;cursor:pointer;font-family:inherit;font-size:12.5px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
+    .dsh-sp__mdBtn{min-width:28px;height:26px;border:none;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;cursor:pointer;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
     .dsh-sp__mdBtn:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1)}
-    .dsh-sp__mdB{font-weight:700}
-    .dsh-sp__mdI{font-style:italic}
-    .dsh-sp__mdS{text-decoration:line-through}
-    .dsh-sp__mdC{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
+    .dsh-sp__mdBtn svg{width:15px;height:15px}
 .dsh-sp__editor[data-drag="true"]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
     .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;flex:1 1 auto;min-height:180px;overflow-y:auto;padding:0;display:block}
     .dsh-sp__preview{width:100%;box-sizing:border-box;flex:1 1 auto;min-height:180px;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
@@ -278,7 +275,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__tileExt{font-size:10px;font-weight:700;letter-spacing:.04em;line-height:1}
 .dsh-sp__tileRemove{position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:50%;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
 .dsh-sp__tileRemove:hover{color:var(--dsw-alias-state-error-primary)}
-.dsh-sp__bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:26px}
+    .dsh-sp__bar{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-height:26px}
 .dsh-sp__iconBtn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:7px;padding:4px 8px;font-size:12px;font-family:inherit;line-height:1.4;cursor:pointer}
 .dsh-sp__iconBtn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .dsh-sp__iconBtn:disabled{opacity:.45;cursor:default}
@@ -1087,6 +1084,36 @@ window.__ModuleLoader__.load({
       return h(LineIcon, { size: 13 },
         h('path', { d: 'M20.5 3.5 3.5 10.5l7 3 3 7z' }),
         h('path', { d: 'M20.5 3.5 10.5 13.5' }));
+    }
+    function EyeIcon() {
+      return h(LineIcon, { size: 13 },
+        h('path', { d: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z' }),
+        h('circle', { cx: 12, cy: 12, r: 3 }));
+    }
+    function PencilIcon() {
+      return h(LineIcon, { size: 13 },
+        h('path', { d: 'M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z' }));
+    }
+    function BoldIcon() {
+      return h(LineIcon, { size: 15 },
+        h('path', { d: 'M6 12h9a4 4 0 0 1 0 8H7a4 4 0 0 1-4-4V5a2 2 0 0 1 2-2h7a4 4 0 0 1 0 8' }));
+    }
+    function ItalicIcon() {
+      return h(LineIcon, { size: 15 },
+        h('path', { d: 'M19 4h-9' }),
+        h('path', { d: 'M14 20H5' }),
+        h('path', { d: 'm15 4-6 16' }));
+    }
+    function StrikethroughIcon() {
+      return h(LineIcon, { size: 15 },
+        h('path', { d: 'M16 4H9a3 3 0 0 0-2.83 4' }),
+        h('path', { d: 'M14 12a4 4 0 0 1 0 8H6' }),
+        h('path', { d: 'M4 12h16' }));
+    }
+    function CodeIcon() {
+      return h(LineIcon, { size: 15 },
+        h('path', { d: 'm16 18 6-6-6-6' }),
+        h('path', { d: 'm8 6-6 6 6 6' }));
     }
 
     function EmptyIcon() {
@@ -2043,53 +2070,61 @@ window.__ModuleLoader__.load({
           type: 'button',
           className: 'dsh-sp__iconBtn',
           title: previewMode ? t('editor.edit') : t('editor.preview'),
+          'aria-label': previewMode ? t('editor.edit') : t('editor.preview'),
           'aria-pressed': previewMode ? 'true' : 'false',
           onClick: () => setPreviewMode((value) => !value),
-        }, previewMode ? t('editor.edit') : t('editor.preview')),
+        }, previewMode ? h(PencilIcon, null) : h(EyeIcon, null)),
         !previewMode ? h('span', { className: 'dsh-sp__mdGroup', role: 'group', 'aria-label': t('editor.mdGroup') },
           h('button', {
             type: 'button',
             className: 'dsh-sp__mdBtn',
             title: t('editor.bold') + ' (⌘B)',
+            'aria-label': t('editor.bold'),
             onClick: () => wrapSelection('**'),
-          }, h('span', { className: 'dsh-sp__mdB' }, 'B')),
+          }, h(BoldIcon, null)),
           h('button', {
             type: 'button',
             className: 'dsh-sp__mdBtn',
             title: t('editor.italic') + ' (⌘I)',
+            'aria-label': t('editor.italic'),
             onClick: () => wrapSelection('*'),
-          }, h('span', { className: 'dsh-sp__mdI' }, 'I')),
+          }, h(ItalicIcon, null)),
           h('button', {
             type: 'button',
             className: 'dsh-sp__mdBtn',
             title: t('editor.strike'),
+            'aria-label': t('editor.strike'),
             onClick: () => wrapSelection('~~'),
-          }, h('span', { className: 'dsh-sp__mdS' }, 'S')),
+          }, h(StrikethroughIcon, null)),
           h('button', {
             type: 'button',
             className: 'dsh-sp__mdBtn',
             title: t('editor.code'),
+            'aria-label': t('editor.code'),
             onClick: () => wrapSelection('`'),
-          }, h('span', { className: 'dsh-sp__mdC' }, '</>'))) : null,
+          }, h(CodeIcon, null))) : null,
         h('button', {
           type: 'button',
           className: 'dsh-sp__iconBtn',
           title: t('editor.image'),
+          'aria-label': t('editor.image'),
           onClick: () => imageInputRef.current?.click(),
-        }, h(ImageIcon, null), t('editor.image')),
+        }, h(ImageIcon, null)),
         h('button', {
           type: 'button',
           className: 'dsh-sp__iconBtn',
           title: t('editor.file'),
+          'aria-label': t('editor.file'),
           onClick: () => fileInputRef.current?.click(),
-        }, h(FileIcon, null), t('editor.file')),
+        }, h(FileIcon, null)),
         h('button', {
           type: 'button',
           className: 'dsh-sp__iconBtn',
           title: t('editor.send'),
+          'aria-label': t('editor.send'),
           disabled: editor.text.trim() === '' && editor.attachments.length === 0,
           onClick: () => sendToChat(editor),
-        }, h(SendIcon, null), t('editor.send')));
+        }, h(SendIcon, null)));
 
       const statusBar = h('div', { className: 'dsh-sp__bar' },
         h('span', { className: 'dsh-sp__status', 'data-error': saveState === 'error' ? 'true' : 'false' },
