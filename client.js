@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
     /** Keep in sync with package.json; tests/version.test.mjs guards the pair. */
     const VERSION = '0.2.8';
     const PANEL_ID = 'scratchpad';
-    const PANEL_ORDER = 24;
+    const PANEL_ORDER = -1;
     const STYLE_ID = '@chaiyahang/dsh-scratchpad/panel.css';
     const API = '/api/scratchpad';
     const LEGACY_DB = 'dsh-scratchpad-panel';
