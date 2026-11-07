@@ -201,6 +201,17 @@ try {
   const trashUnchanged = await harness.request('GET', '/api/scratchpad/notes', { query: { view: 'trash', since: String(stale.body.revision) } });
   assert(trashUnchanged.body.unchanged === true, 'the trash view honors since too');
 
+  // Thumb variant: upload main + thumb, link them, serve by variant.
+  const mainUp = await harness.request('POST', FILES, { bytes: Buffer.from([9, 9]), query: { name: 'big.png', type: 'image/png' } });
+  const thumbUp = await harness.request('POST', FILES, { bytes: Buffer.from([7]), query: { name: 'big.t.webp', type: 'image/webp' } });
+  const thumbNote = { id: 'thumb-note', text: '带缩略图', createdAt: 1, updatedAt: 2, attachments: [{ ...mainUp.body.attachment, thumbName: thumbUp.body.attachment.storedName }] };
+  await harness.request('POST', '/api/scratchpad/notes', { json: { note: thumbNote } });
+  const thumbServe = await harness.request('GET', FILES, { query: { id: mainUp.body.attachment.id, variant: 'thumb' } });
+  assert(thumbServe.status === 200 && thumbServe.headers.get('content-type') === 'image/webp' && thumbServe.buffer.equals(Buffer.from([7])),
+    'the thumb variant serves the thumbnail bytes');
+  const mainServe = await harness.request('GET', FILES, { query: { id: mainUp.body.attachment.id } });
+  assert(mainServe.buffer.equals(Buffer.from([9, 9])), 'the main file serves without the variant');
+
   console.log('notes test passed');
 } finally {
   await harness.cleanup();

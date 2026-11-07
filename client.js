@@ -390,6 +390,65 @@ window.__ModuleLoader__.load({
       return body.attachment;
     }
 
+    const IMAGE_MAX_EDGE = 1600;
+    const IMAGE_COMPRESS_THRESHOLD = 1.5 * 1024 * 1024;
+    const THUMB_EDGE = 96;
+
+    async function decodeImage(file) {
+      if (!file.type.startsWith('image/') || file.type === 'image/gif') return null;
+      try {
+        return await createImageBitmap(file);
+      } catch {
+        return null;
+      }
+    }
+
+    function canvasToBlob(canvas, type, quality) {
+      return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+    }
+
+    /** Downscale big pasted/dropped images to ≤1600px webp (original when no win). */
+    async function compressImage(file, bitmap) {
+      if (file.size <= IMAGE_COMPRESS_THRESHOLD) return file;
+      const decoded = bitmap || (await decodeImage(file));
+      if (!decoded) return file;
+      try {
+        const scale = Math.min(1, IMAGE_MAX_EDGE / Math.max(decoded.width, decoded.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(decoded.width * scale));
+        canvas.height = Math.max(1, Math.round(decoded.height * scale));
+        const ctx2d = canvas.getContext('2d');
+        ctx2d.fillStyle = '#ffffff';
+        ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+        ctx2d.drawImage(decoded, 0, 0, canvas.width, canvas.height);
+        const blob = await canvasToBlob(canvas, 'image/jpeg', 0.85);
+        if (!blob || blob.size >= file.size) return file;
+        const name = (file.name || 'image').replace(/\.[^.]+$/, '') + '.jpg';
+        return new File([blob], name, { type: 'image/jpeg', lastModified: Date.now() });
+      } catch {
+        return file;
+      }
+    }
+
+    /** 96px webp thumbnail for the feed tiles/thumbs. */
+    async function makeThumb(file, bitmap) {
+      try {
+        const decoded = bitmap || (await decodeImage(file));
+        if (!decoded) return null;
+        const scale = Math.min(1, THUMB_EDGE / Math.max(decoded.width, decoded.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(decoded.width * scale));
+        canvas.height = Math.max(1, Math.round(decoded.height * scale));
+        canvas.getContext('2d').drawImage(decoded, 0, 0, canvas.width, canvas.height);
+        const blob = await canvasToBlob(canvas, 'image/webp', 0.8);
+        if (!blob || blob.size === 0) return null;
+        const name = (file.name || 'thumb').replace(/\.[^.]+$/, '') + '.t.webp';
+        return new File([blob], name, { type: 'image/webp', lastModified: Date.now() });
+      } catch {
+        return null;
+      }
+    }
+
     async function deleteRemoteFile(attachment) {
       try {
         await apiJson(`${API}/files/delete`, {
@@ -400,10 +459,11 @@ window.__ModuleLoader__.load({
       } catch {}
     }
 
-    function attachmentUrl(id, download) {
+    function attachmentUrl(id, download, variant) {
       const query = new URLSearchParams({ id });
+      if (variant === 'thumb') query.set('variant', 'thumb');
       if (download) query.set('download', '1');
-      return `${API}/files?${query.toString()}`;
+      return API + '/files?' + query.toString();
     }
 
     // ---------------------------------------------------------------------
@@ -1136,7 +1196,7 @@ window.__ModuleLoader__.load({
           className: 'dsh-sp__tileOpen',
           title: label,
           onClick: () => onOpen(attachment),
-        }, h('img', { className: 'dsh-sp__tileImg', src: attachmentUrl(attachment.id), alt: '', loading: 'lazy', decoding: 'async' }))
+        }, h('img', { className: 'dsh-sp__tileImg', src: attachmentUrl(attachment.id, false, 'thumb'), alt: '', loading: 'lazy', decoding: 'async' }))
         : h('a', {
           className: 'dsh-sp__tileOpen',
           href: attachmentUrl(attachment.id, true),
@@ -1157,7 +1217,7 @@ window.__ModuleLoader__.load({
     function NoteThumb({ attachment }) {
       if (attachment.kind === 'image') {
         return h('span', { className: 'dsh-sp__thumb', title: attachment.name },
-          h('img', { className: 'dsh-sp__thumbImg', src: attachmentUrl(attachment.id), alt: '', loading: 'lazy', decoding: 'async' }));
+          h('img', { className: 'dsh-sp__thumbImg', src: attachmentUrl(attachment.id, false, 'thumb'), alt: '', loading: 'lazy', decoding: 'async' }));
       }
       return h('span', { className: 'dsh-sp__thumb', title: `${attachment.name} (${formatSize(attachment.size)})` }, extensionOf(attachment.name));
     }
@@ -1671,8 +1731,25 @@ window.__ModuleLoader__.load({
             rejected.push(file.name || 'attachment');
             continue;
           }
+          let thumbName = null;
+          let uploadFile = file;
           try {
-            accepted.push(await uploadAttachment(file));
+            const bitmap = await decodeImage(file);
+            if (bitmap) {
+              uploadFile = await compressImage(file, bitmap);
+              const thumbBlob = await makeThumb(file, bitmap);
+              bitmap.close();
+              if (thumbBlob) {
+                const thumb = await uploadAttachment(thumbBlob);
+                thumbName = thumb.storedName;
+              }
+            }
+          } catch {
+            // 压缩/缩略图失败不阻塞上传——回退到原图
+          }
+          try {
+            const uploaded = await uploadAttachment(uploadFile);
+            accepted.push({ ...uploaded, thumbName: thumbName || null });
           } catch {
             rejected.push(file.name || 'attachment');
           }

@@ -6,7 +6,7 @@
  * the Agent tools read and write the same durable store. The client talks to it
  * through the authenticated shared Fetch channel at `/api/scratchpad/*`.
  */
-import { copyFile, link, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { copyFile, link, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import os from 'node:os';
 
@@ -19,6 +19,10 @@ const MAX_LIST_LIMIT = 100;
 const EXPORT_FORMAT = 'dsh-scratchpad';
 const IMPORT_MAX_BYTES = 100 * 1024 * 1024;
 const MAX_IMPORT_NOTES = 5000;
+/** Unreferenced attachment files younger than this are kept (in-flight drafts). */
+const ORPHAN_GRACE_MS = 60 * 60 * 1000;
+/** How often the orphan attachment sweep runs. */
+const GC_INTERVAL_MS = 60 * 60 * 1000;
 const MAX_TAGS = 12;
 const MAX_TAG_LENGTH = 32;
 /** Types a browser renders without executing anything; every other served file downloads. */
@@ -429,6 +433,7 @@ export function apply(ctx) {
   async function handleFile(request) {
     const url = new URL(request.url);
     const id = url.searchParams.get('id') || '';
+    const requestedThumb = url.searchParams.get('variant') === 'thumb';
     if (!id) throw badRequest('missing attachment id');
     const state = await readState();
     let attachment = null;
@@ -442,21 +447,31 @@ export function apply(ctx) {
     if (!attachment) attachment = recentUploads.get(id) || null;
     if (!attachment) return new Response('not found', { status: 404 });
     let bytes;
+    let servedName = null;
     try {
-      bytes = await readFile(join(filesDir, attachment.storedName));
+      servedName = requestedThumb && attachment.thumbName ? attachment.thumbName : attachment.storedName;
+      bytes = await readFile(join(filesDir, servedName));
     } catch {
-      return new Response('not found', { status: 404 });
+      if (servedName === null || servedName === attachment.storedName) return new Response('not found', { status: 404 });
+      servedName = attachment.storedName;
+      try {
+        bytes = await readFile(join(filesDir, servedName));
+      } catch {
+        return new Response('not found', { status: 404 });
+      }
     }
     // Inline only what a browser renders without running code — svg, html, pdf
     // and friends are opaque bytes that download instead of rendering, so a
     // hostile upload (or import) can never execute script in the app origin.
     // The sandbox CSP is a second belt: even a mistyped document renders with
     // no scripting and a unique origin.
-    const inline = INLINE_IMAGE_TYPES.test(attachment.type) && url.searchParams.get('download') !== '1';
+    const servingThumb = requestedThumb && servedName === attachment.thumbName;
+    const servedType = servingThumb ? 'image/webp' : attachment.type;
+    const inline = INLINE_IMAGE_TYPES.test(servedType) && url.searchParams.get('download') !== '1';
     return new Response(bytes, {
       status: 200,
       headers: {
-        'content-type': inline ? attachment.type : 'application/octet-stream',
+        'content-type': inline ? servedType : 'application/octet-stream',
         'content-length': String(bytes.byteLength),
         'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(attachment.name)}`,
         'cache-control': 'private, max-age=31536000, immutable',
@@ -493,6 +508,40 @@ export function apply(ctx) {
         await unlink(join(filesDir, attachment.storedName));
       } catch {}
     }));
+  }
+
+  /** Delete attachment files that no note (live or in the trash) references. */
+  async function sweepOrphans() {
+    await enqueue(async () => {
+      const state = await load();
+      const referenced = new Set();
+      for (const note of state.notes) {
+        for (const attachment of note.attachments) {
+          referenced.add(attachment.storedName);
+          if (attachment.thumbName) referenced.add(attachment.thumbName);
+        }
+      }
+      for (const attachment of recentUploads.values()) {
+        referenced.add(attachment.storedName);
+        if (attachment.thumbName) referenced.add(attachment.thumbName);
+      }
+      let entries;
+      try {
+        entries = await readdir(filesDir);
+      } catch {
+        return;
+      }
+      const cutoff = Date.now() - ORPHAN_GRACE_MS;
+      const orphans = [];
+      for (const name of entries) {
+        if (referenced.has(name)) continue;
+        const info = await stat(join(filesDir, name)).catch(() => null);
+        if (!info || !info.isFile()) continue;
+        if (info.mtimeMs > cutoff) continue;
+        orphans.push({ storedName: name });
+      }
+      if (orphans.length > 0) await removeFiles(orphans);
+    });
   }
 
   // -------------------------------------------------------------------
@@ -724,6 +773,7 @@ export function apply(ctx) {
     void load().catch((error) => ctx.logger?.warn?.('scratchpad: could not load notes:', error instanceof Error ? error.message : String(error)));
     const sweep = () => {
       void purgeExpired().catch((error) => ctx.logger?.warn?.('scratchpad: purge sweep failed:', error instanceof Error ? error.message : String(error)));
+      void sweepOrphans().catch((error) => ctx.logger?.warn?.('scratchpad: orphan sweep failed:', error instanceof Error ? error.message : String(error)));
     };
     sweep();
     const sweeper = setInterval(sweep, 60 * 60 * 1000);
@@ -830,13 +880,15 @@ function readAttachment(input) {
   if (input === null || typeof input !== 'object') return null;
   const id = typeof input.id === 'string' ? input.id : '';
   const storedName = typeof input.storedName === 'string' ? input.storedName : '';
+  const thumbName = typeof input.thumbName === 'string' ? input.thumbName : '';
   if (!/^[A-Za-z0-9-]{1,80}$/.test(id)) return null;
   if (!/^[A-Za-z0-9-]{1,80}(?:\.[A-Za-z0-9]{1,10})?$/.test(storedName)) return null;
+  if (thumbName !== '' && !/^[A-Za-z0-9-]{1,80}(?:\.[A-Za-z0-9]{1,10})?$/.test(thumbName)) return null;
   const name = typeof input.name === 'string' ? input.name.slice(0, 200) : 'attachment';
   const type = typeof input.type === 'string' ? input.type.slice(0, 200) : '';
   const size = Number.isFinite(input.size) && input.size >= 0 ? Math.round(input.size) : 0;
   const kind = input.kind === 'image' ? 'image' : 'file';
-  return { id, name, type, size, kind, storedName };
+  return { id, name, type, size, kind, storedName, thumbName: thumbName || null };
 }
 
 /** Normalize tags: trimmed, single-spaced, unique case-insensitively, bounded. */
