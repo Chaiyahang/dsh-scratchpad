@@ -23,7 +23,7 @@ try {
   const entries = (await readdir(filesDir)).sort();
   assert(!entries.includes('orphan-old.png'), 'an old unreferenced orphan is swept');
   assert(entries.includes('orphan-fresh.png'), 'a fresh orphan survives the grace window');
-  assert(entries.includes('keep.png'), 'trash-referenced files are kept');
+  assert(entries.includes(keep.body.attachment.storedName), 'trash-referenced files are kept');
   console.log('gc test passed');
 } finally {
   await harness.cleanup();
