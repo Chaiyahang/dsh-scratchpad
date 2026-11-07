@@ -17,7 +17,7 @@ try {
   await utimes(join(filesDir, 'orphan-old.png'), twoHoursAgo, twoHoursAgo);
   await writeFile(join(filesDir, 'orphan-fresh.png'), Buffer.from([4]));
 
-  harness.watchdogs[harness.watchdogs.length - 1]();
+  harness.watchdogs[0]();
   await new Promise((resolve) => setTimeout(resolve, 100));
 
   const entries = (await readdir(filesDir)).sort();
