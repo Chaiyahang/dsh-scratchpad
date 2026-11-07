@@ -409,8 +409,9 @@ window.__ModuleLoader__.load({
 
     /** Downscale big pasted/dropped images to ≤1600px webp (original when no win). */
     async function compressImage(file, bitmap) {
-      if (file.size <= IMAGE_COMPRESS_THRESHOLD) return file;
       const decoded = bitmap || (await decodeImage(file));
+      const oversized = decoded !== null && Math.max(decoded.width, decoded.height) > IMAGE_MAX_EDGE;
+      if (file.size <= IMAGE_COMPRESS_THRESHOLD && !oversized) return file;
       if (!decoded) return file;
       try {
         const scale = Math.min(1, IMAGE_MAX_EDGE / Math.max(decoded.width, decoded.height));
