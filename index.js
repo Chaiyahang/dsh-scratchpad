@@ -237,6 +237,22 @@ export function apply(ctx) {
 
   async function handleDeleteNote(request) {
     const body = await readBody(request);
+    if (body?.emptyTrash === true) {
+      // Empty the trash: hard-delete every soft-deleted note and its files now.
+      const attachments = await mutate((state) => {
+        const removed = [];
+        const kept = [];
+        for (const note of state.notes) {
+          if (note.deletedAt) removed.push(note);
+          else kept.push(note);
+        }
+        if (removed.length === 0) return [];
+        state.notes = kept;
+        return removed.flatMap((note) => note.attachments);
+      });
+      await removeFiles(attachments);
+      return json({ ok: true });
+    }
     const id = typeof body?.id === 'string' ? body.id : '';
     if (!id) throw badRequest('missing note id');
     if (body?.permanent === true) {

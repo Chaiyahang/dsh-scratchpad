@@ -16,11 +16,12 @@ const useRef = (value) => ({ current: value });
 const useCallback = (fn) => fn;
 const useMemo = (compute) => compute();
 const useEffect = () => {};
+const useLayoutEffect = () => {};
 const React = { Fragment: 'fragment' };
 
-const build = new Function('h', 'React', 'useState', 'useEffect', 'useMemo', 'useRef', 'useCallback',
+const build = new Function('h', 'React', 'useState', 'useEffect', 'useLayoutEffect', 'useMemo', 'useRef', 'useCallback',
   body + '\nreturn { PanelPage, NoteCard, TrashCard, AttachmentTile, Lightbox };');
-const parts = build(createElement, React, useState, useEffect, useMemo, useRef, useCallback);
+const parts = build(createElement, React, useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback);
 
 function assert(condition, message) {
   if (!condition) throw new Error(`assertion failed: ${message}`);

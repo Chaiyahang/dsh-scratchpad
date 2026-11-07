@@ -189,6 +189,23 @@ try {
   assert((await readdir(join(harness.dir, 'scratchpad', 'files'))).length === trashFilesBefore - 1,
     'a permanent delete removes the attachment files');
 
+  // Empty the trash in one call: every soft-deleted note and its files go now.
+  const binA = await harness.request('POST', FILES, { bytes: Buffer.from([1]), query: { name: 'a.bin', type: 'application/octet-stream' } });
+  const binB = await harness.request('POST', FILES, { bytes: Buffer.from([2]), query: { name: 'b.bin', type: 'application/octet-stream' } });
+  await harness.request('POST', '/api/scratchpad/notes', { json: { note: { id: 'trash-a', text: 'a', createdAt: 1, updatedAt: 2, attachments: [binA.body.attachment] } } });
+  await harness.request('POST', '/api/scratchpad/notes', { json: { note: { id: 'trash-b', text: 'b', createdAt: 1, updatedAt: 2, attachments: [binB.body.attachment] } } });
+  await harness.request('POST', '/api/scratchpad/notes/delete', { json: { id: 'trash-a' } });
+  await harness.request('POST', '/api/scratchpad/notes/delete', { json: { id: 'trash-b' } });
+  const liveFilesBefore = (await readdir(join(harness.dir, 'scratchpad', 'files'))).length;
+  result = await harness.request('POST', '/api/scratchpad/notes/delete', { json: { emptyTrash: true } });
+  assert(result.status === 200, 'emptying the trash answers ok');
+  state = await harness.request('GET', '/api/scratchpad/notes', { query: { view: 'trash' } });
+  assert(state.body.notes.length === 0, 'emptying the trash drops every trashed note');
+  state = await harness.request('GET', '/api/scratchpad/notes');
+  assert(state.body.notes.some((item) => item.id === 'stale'), 'live notes survive emptying the trash');
+  assert((await readdir(join(harness.dir, 'scratchpad', 'files'))).length === liveFilesBefore - 2,
+    'emptying the trash removes every trashed note\'s files');
+
   // Conditional list: a matching since short-circuits, a stale one returns all.
   const currentRevision = (await harness.request('GET', '/api/scratchpad/notes')).body.revision;
   const unchanged = await harness.request('GET', '/api/scratchpad/notes', { query: { since: String(currentRevision) } });

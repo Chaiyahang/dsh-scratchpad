@@ -10,7 +10,7 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react');
     const h = React.createElement;
-    const { useCallback, useEffect, useMemo, useRef, useState } = React;
+    const { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } = React;
 
     /** Locale namespace and the `main` key / sidebar id share one identifier. */
     const NS = 'scratchpad';
@@ -50,6 +50,8 @@ window.__ModuleLoader__.load({
         'trash.empty': 'Trash is empty.',
         'trash.restore': 'Restore',
         'trash.deleteForever': 'Delete forever',
+        'trash.emptyAll': 'Empty trash',
+        'trash.confirmEmpty': 'Sure? Delete all',
         'trash.expiresPrefix': 'auto-deletes in',
         'trash.expiresSuffix': 'days',
         'editor.placeholder': 'Jot an idea down…',
@@ -70,6 +72,9 @@ window.__ModuleLoader__.load({
         'editor.italic': 'Italic',
         'editor.strike': 'Strikethrough',
         'editor.code': 'Inline code',
+        'editor.heading': 'Heading',
+        'editor.ul': 'Bulleted list',
+        'editor.ol': 'Numbered list',
         'editor.mdGroup': 'Markdown formatting',
         'editor.remove': 'Remove attachment',
         'note.pin': 'Pin note',
@@ -133,6 +138,8 @@ window.__ModuleLoader__.load({
         'trash.empty': '回收站是空的。',
         'trash.restore': '恢复',
         'trash.deleteForever': '彻底删除',
+        'trash.emptyAll': '清空回收站',
+        'trash.confirmEmpty': '确认全部删除？',
         'trash.expiresPrefix': '剩',
         'trash.expiresSuffix': '天自动清除',
         'editor.placeholder': '随手记点什么…',
@@ -153,6 +160,9 @@ window.__ModuleLoader__.load({
         'editor.italic': '斜体',
         'editor.strike': '删除线',
         'editor.code': '行内代码',
+        'editor.heading': '标题',
+        'editor.ul': '无序列表',
+        'editor.ol': '有序列表',
         'editor.mdGroup': 'Markdown 格式',
         'editor.remove': '移除附件',
         'note.pin': '置顶',
@@ -202,7 +212,7 @@ window.__ModuleLoader__.load({
     .dsh-sp{display:flex;justify-content:center;height:100%;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font-family:inherit}
     .dsh-sp__cols{display:flex;gap:16px;flex:1;min-height:0}
     .dsh-sp__composerCol{flex:0 0 380px;display:flex;flex-direction:column;gap:10px;min-width:0;padding-bottom:20px}
-    .dsh-sp__composerCol .dsh-sp__editor{flex:1;min-height:0}
+    .dsh-sp__composerCol .dsh-sp__editor{flex:0 1 auto;min-height:0}
     .dsh-sp__feedCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0}
     .dsh-sp__listScroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 0 20px}
     .dsh-sp__composerFold{display:flex;align-items:center;gap:8px;width:100%;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:12px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
@@ -231,12 +241,12 @@ window.__ModuleLoader__.load({
 .dsh-sp__editor{flex:none;display:flex;flex-direction:column;gap:10px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:12px 14px;transition:border-color .12s ease}
     .dsh-sp__editor:focus-within{border-color:var(--dsw-alias-brand-primary)}
     .dsh-sp__mdGroup{display:inline-flex;align-items:center;gap:2px;background:var(--dsw-alias-bg-layer-2);border-radius:8px;padding:2px}
-    .dsh-sp__mdBtn{min-width:28px;height:26px;border:none;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;cursor:pointer;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
+    .dsh-sp__mdBtn{min-width:24px;height:26px;border:none;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:6px;cursor:pointer;font-family:inherit;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0}
     .dsh-sp__mdBtn:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1)}
     .dsh-sp__mdBtn svg{width:15px;height:15px}
 .dsh-sp__editor[data-drag="true"]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
-    .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;flex:1 1 auto;min-height:180px;overflow-y:auto;padding:0;display:block}
-    .dsh-sp__preview{width:100%;box-sizing:border-box;flex:1 1 auto;min-height:180px;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
+    .dsh-sp__textarea{width:100%;box-sizing:border-box;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13.5px;line-height:1.65;resize:none;outline:none;flex:0 1 auto;min-height:160px;overflow-y:auto;padding:0;display:block}
+    .dsh-sp__preview{width:100%;box-sizing:border-box;flex:0 1 auto;min-height:160px;overflow-y:auto;font-size:13.5px;line-height:1.65;padding:0;color:var(--dsw-alias-label-primary)}
 .dsh-sp__previewEmpty{font-size:13px;color:var(--dsw-alias-label-secondary)}
 .dsh-sp__mdH{margin:2px 0 6px;line-height:1.35;color:var(--dsw-alias-label-primary);font-weight:600}
 .dsh-sp__mdH1{font-size:16px}
@@ -275,7 +285,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__tileExt{font-size:10px;font-weight:700;letter-spacing:.04em;line-height:1}
 .dsh-sp__tileRemove{position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:50%;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
 .dsh-sp__tileRemove:hover{color:var(--dsw-alias-state-error-primary)}
-    .dsh-sp__bar{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-height:26px}
+    .dsh-sp__bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:26px}
 .dsh-sp__iconBtn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:7px;padding:4px 8px;font-size:12px;font-family:inherit;line-height:1.4;cursor:pointer}
 .dsh-sp__iconBtn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .dsh-sp__iconBtn:disabled{opacity:.45;cursor:default}
@@ -286,6 +296,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__textBtn:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
 .dsh-sp__textBtn:disabled{opacity:.5;cursor:default}
 .dsh-sp__textBtn:disabled:hover{background:transparent;color:var(--dsw-alias-label-secondary)}
+.dsh-sp__textBtn[data-danger="true"]{color:var(--dsw-alias-state-error-primary)}
 .dsh-sp__status{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
 .dsh-sp__status[data-error="true"]{color:var(--dsw-alias-state-error-primary)}
 .dsh-sp__notice{flex:none;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -321,6 +332,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__noteOpen{display:block;width:100%;text-align:left;border:none;background:transparent;padding:0;color:var(--dsw-alias-label-primary);cursor:pointer;font-family:inherit}
 .dsh-sp__noteOpen:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;border-radius:6px}
 .dsh-sp__noteText{margin:0;font-size:13px;line-height:1.65;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.dsh-sp__noteText mark.dsh-sp__hit,.dsh-sp__noteTag mark.dsh-sp__hit{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label);border-radius:3px;padding:0 1px}
 .dsh-sp__noteText[data-empty="true"]{color:var(--dsw-alias-label-secondary);font-style:italic}
 .dsh-sp__noteAttach{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px}
 .dsh-sp__thumb{width:30px;height:30px;border-radius:6px;overflow:hidden;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;letter-spacing:.03em;color:var(--dsw-alias-label-secondary);flex:none}
@@ -378,6 +390,14 @@ window.__ModuleLoader__.load({
 
     async function fetchTrashList(since) {
       return apiJson(since > 0 ? API + '/notes?view=trash&since=' + since : API + '/notes?view=trash');
+    }
+
+    async function emptyTrashRemote() {
+      await apiJson(`${API}/notes/delete`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ emptyTrash: true }),
+      });
     }
 
     async function uploadAttachment(file) {
@@ -572,46 +592,70 @@ window.__ModuleLoader__.load({
     // Lightweight Markdown rendering (no dependencies, no raw HTML)
     // ---------------------------------------------------------------------
 
+    /**
+     * Split a plain-text chunk into text + <mark> spans around the search
+     * needle (case-insensitive). No needle → the chunk passes through as-is.
+     */
+    function highlightNodes(chunk, needle, keyBase) {
+      const source = String(chunk);
+      const target = typeof needle === 'string' ? needle.trim().toLowerCase() : '';
+      if (target === '') return [source];
+      const lowered = source.toLowerCase();
+      const parts = [];
+      let cursor = 0;
+      let at = lowered.indexOf(target);
+      let count = 0;
+      while (at >= 0) {
+        if (at > cursor) parts.push(source.slice(cursor, at));
+        parts.push(h('mark', { key: `${keyBase}-${count++}`, className: 'dsh-sp__hit' }, source.slice(at, at + target.length)));
+        cursor = at + target.length;
+        at = lowered.indexOf(target, cursor);
+      }
+      if (cursor < source.length) parts.push(source.slice(cursor));
+      return parts;
+    }
+
     /** Inline spans: code, bold, italic. Text stays plain React children. */
-    function renderInline(text) {
+    function renderInline(text, needle) {
       const source = String(text);
       const pattern = /(`[^`\n]+`|\*\*[^*\n]+\*\*|~~[^~\n]+~~|\*[^*\n]+\*|\[[^\]\n]+\]\([^)\s]+\)|https?:[/][/][^\s<>()\u0022\u0027\u201c\u201d\u2018\u2019\u2026\u2014\u3000-\u303f\uff00-\uffef\u4e00-\u9fff]+)/g;
       const nodes = [];
       let cursor = 0;
       let index = 0;
+      let hit = 0;
       let match;
       const pushLink = (linkUrl, label) => {
         index += 1;
         nodes.push(h('a', { key: index, className: 'dsh-sp__mdLink', href: linkUrl, target: '_blank', rel: 'noopener noreferrer', onClick: (event) => { event.preventDefault(); event.stopPropagation(); openExternal(linkUrl); } }, label));
       };
       while ((match = pattern.exec(source)) !== null) {
-        if (match.index > cursor) nodes.push(source.slice(cursor, match.index));
+        if (match.index > cursor) nodes.push(...highlightNodes(source.slice(cursor, match.index), needle, `p${hit++}`));
         const token = match[0];
         if (token.startsWith('`')) {
-          nodes.push(h('code', { key: `c${index++}`, className: 'dsh-sp__mdCode' }, token.slice(1, -1)));
+          nodes.push(h('code', { key: `c${index++}`, className: 'dsh-sp__mdCode' }, highlightNodes(token.slice(1, -1), needle, `c${index}${hit++}`)));
         } else if (token.startsWith('**')) {
-          nodes.push(h('strong', { key: `b${index++}` }, token.slice(2, -2)));
+          nodes.push(h('strong', { key: `b${index++}` }, highlightNodes(token.slice(2, -2), needle, `b${index}${hit++}`)));
         } else if (token.startsWith('~~')) {
-          nodes.push(h('del', { key: `s${index++}` }, token.slice(2, -2)));
+          nodes.push(h('del', { key: `s${index++}` }, highlightNodes(token.slice(2, -2), needle, `s${index}${hit++}`)));
         } else if (token.startsWith('*')) {
-          nodes.push(h('em', { key: `e${index++}` }, token.slice(1, -1)));
+          nodes.push(h('em', { key: `e${index++}` }, highlightNodes(token.slice(1, -1), needle, `e${index}${hit++}`)));
         } else if (token.startsWith('[')) {
           const link = /^\[([^\]\n]+)\]\(([^)\s]+)\)$/.exec(token);
           // Only http(s)/mailto targets become anchors; anything else stays
           // literal text so a crafted note can never script the panel.
           if (link !== null && /^(https?:[/][/]|mailto:)/i.test(link[2])) {
-            pushLink(link[2], renderInline(link[1]));
+            pushLink(link[2], renderInline(link[1], needle));
           } else {
             nodes.push(token);
           }
         } else {
           const url = token.replace(/[.,;:!?]+$/, '');
-          pushLink(url, url);
+          pushLink(url, highlightNodes(url, needle, `u${index}${hit++}`));
           if (url.length < token.length) nodes.push(token.slice(url.length));
         }
         cursor = match.index + token.length;
       }
-      if (cursor < source.length) nodes.push(source.slice(cursor));
+      if (cursor < source.length) nodes.push(...highlightNodes(source.slice(cursor), needle, `p${hit++}`));
       return nodes;
     }
 
@@ -722,6 +766,39 @@ window.__ModuleLoader__.load({
         return { text: text.slice(0, start) + inner + text.slice(end), start, end: start + inner.length };
       }
       return { text: text.slice(0, start) + marker + selected + marker + text.slice(end), start: start + marker.length, end: start + marker.length + selected.length };
+    }
+
+    /**
+     * Toggle a line-level marker (heading / list) across the affected lines,
+     * expanded from text[start:end] to whole lines. Lines that all carry the
+     * marker lose it; otherwise any existing block marker is replaced with the
+     * target one. Ordered lists are numbered by position, blank lines inside a
+     * multi-line selection stay blank, and the returned span covers the
+     * rewritten lines so a repeated click toggles them back.
+     */
+    function toggleLinePrefix(text, start, end, kind) {
+      const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+      let lineEnd = text.indexOf('\n', end);
+      if (lineEnd < 0) lineEnd = text.length;
+      const lines = text.slice(lineStart, lineEnd).split('\n');
+      const blockMarker = /^\s*(?:#{1,3}\s+|[-*]\s+\[[ xX]\]\s?|[-*]\s+|\d+\.\s+)/;
+      const kindMarker = {
+        heading: /^\s*#{1,3}\s+/,
+        ul: /^\s*[-*]\s+(?:\[[ xX]\]\s?)?/,
+        ol: /^\s*\d+\.\s+/,
+      }[kind];
+      const allMarked = lines.some((line) => kindMarker.test(line))
+        && lines.every((line) => line.trim() === '' || kindMarker.test(line));
+      let counter = 0;
+      const next = lines.map((line) => {
+        if (allMarked) return line.replace(kindMarker, '');
+        if (line.trim() === '' && lines.length > 1) return line;
+        const bare = line.replace(blockMarker, '');
+        if (kind === 'ol') return `${++counter}. ${bare}`;
+        return (kind === 'heading' ? '## ' : '- ') + bare;
+      });
+      const body = next.join('\n');
+      return { text: text.slice(0, lineStart) + body + text.slice(lineEnd), start: lineStart, end: lineStart + body.length };
     }
 
     function toPlainExcerpt(text) {
@@ -1177,6 +1254,31 @@ window.__ModuleLoader__.load({
         h('path', { d: 'm8 6-6 6 6 6' }));
     }
 
+    function HeadingIcon() {
+      return h(LineIcon, { size: 15 },
+        h('text', { x: 12, y: 16.2, fontSize: 12, fontWeight: 600, textAnchor: 'middle', fill: 'currentColor', stroke: 'none', fontFamily: 'inherit' }, 'H2'));
+    }
+
+    function ListIcon() {
+      return h(LineIcon, { size: 15 },
+        h('path', { d: 'M9 6h11' }),
+        h('path', { d: 'M9 12h11' }),
+        h('path', { d: 'M9 18h11' }),
+        h('circle', { cx: 4.5, cy: 6, r: 1.1 }),
+        h('circle', { cx: 4.5, cy: 12, r: 1.1 }),
+        h('circle', { cx: 4.5, cy: 18, r: 1.1 }));
+    }
+
+    function ListOrderedIcon() {
+      return h(LineIcon, { size: 15 },
+        h('path', { d: 'M10 6h10' }),
+        h('path', { d: 'M10 12h10' }),
+        h('path', { d: 'M10 18h10' }),
+        h('text', { x: 4.5, y: 8.8, fontSize: 8, fontWeight: 600, textAnchor: 'middle', fill: 'currentColor', stroke: 'none', fontFamily: 'inherit' }, '1'),
+        h('text', { x: 4.5, y: 14.8, fontSize: 8, fontWeight: 600, textAnchor: 'middle', fill: 'currentColor', stroke: 'none', fontFamily: 'inherit' }, '2'),
+        h('text', { x: 4.5, y: 20.8, fontSize: 8, fontWeight: 600, textAnchor: 'middle', fill: 'currentColor', stroke: 'none', fontFamily: 'inherit' }, '3'));
+    }
+
     function EmptyIcon() {
       return h(LineIcon, { size: 34 },
         h('rect', { x: 4.5, y: 3, width: 15, height: 18, rx: 2.5 }),
@@ -1318,7 +1420,8 @@ window.__ModuleLoader__.load({
     // Note card
     // ---------------------------------------------------------------------
 
-    function NoteCard({ note, active, confirming, t, onOpen, onTogglePin, onRequestDelete, onSend }) {
+    function NoteCard({ note, active, confirming, query, t, onOpen, onTogglePin, onRequestDelete, onSend }) {
+      const needle = typeof query === 'string' ? query.trim() : '';
       const preview = toPlainExcerpt(note.text).trim();
       return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false' },
         h('div', { className: 'dsh-sp__noteTop' },
@@ -1365,11 +1468,11 @@ window.__ModuleLoader__.load({
         h('span', {
           className: 'dsh-sp__noteText',
           'data-empty': preview ? 'false' : 'true',
-        }, preview ? renderInline(preview) : t('note.untitled')),
+        }, preview ? renderInline(preview, needle) : t('note.untitled')),
         note.attachments.length > 0 ? h('span', { className: 'dsh-sp__noteAttach' },
           note.attachments.map((attachment) => h(NoteThumb, { key: attachment.id, attachment }))) : null,
         note.tags.length > 0 ? h('span', { className: 'dsh-sp__noteTags' },
-          note.tags.map((tag) => h('span', { key: tag, className: 'dsh-sp__noteTag' }, `#${tag}`))) : null));
+          note.tags.map((tag) => h('span', { key: tag, className: 'dsh-sp__noteTag' }, highlightNodes(`#${tag}`, needle, `tag-${tag}`)))) : null));
     }
 
     function TrashCard({ note, t, onRestore, onDeleteForever }) {
@@ -1429,6 +1532,8 @@ window.__ModuleLoader__.load({
       const [composerOpen, setComposerOpen] = useState(true);
       const [query, setQuery] = useState('');
       const [confirmId, setConfirmId] = useState(null);
+      /** Two-click confirm for "empty the trash" in the list header. */
+      const [confirmEmpty, setConfirmEmpty] = useState(false);
       const [dragging, setDragging] = useState(false);
       const [preview, setPreview] = useState(null);
       const [previewMode, setPreviewMode] = useState(false);
@@ -1446,6 +1551,7 @@ window.__ModuleLoader__.load({
       const timerRef = useRef(0);
       const confirmTimerRef = useRef(0);
       const trashTimerRef = useRef(0);
+      const emptyTimerRef = useRef(0);
       const searchInputRef = useRef(null);
       const textareaRef = useRef(null);
       const imageInputRef = useRef(null);
@@ -1550,9 +1656,10 @@ window.__ModuleLoader__.load({
               if (alive) setTrashed(sortByDeleted(result.notes));
             }).catch(() => {});
             if (!restoreDraft() && sorted.length > 0) {
-              updateEditor(copyOf(sorted[0]));
-              baseRef.current = sorted[0].updatedAt;
-              setSaveState('saved');
+              // Fresh panel entry starts an empty composer: switching to the
+              // panel is a new jot, not a reopen of the newest note. Editing an
+              // existing note is the card's job (openNote), never the default.
+              setSaveState('idle');
             }
             setReady(true);
           } catch (error) {
@@ -2001,6 +2108,29 @@ window.__ModuleLoader__.load({
         })();
       }, []);
 
+      /** Two-click confirm, then hard-delete every trashed note and its files. */
+      const emptyTrash = useCallback(() => {
+        if (!confirmEmpty) {
+          setConfirmEmpty(true);
+          window.clearTimeout(emptyTimerRef.current);
+          emptyTimerRef.current = window.setTimeout(() => setConfirmEmpty(false), 3000);
+          return;
+        }
+        window.clearTimeout(emptyTimerRef.current);
+        setConfirmEmpty(false);
+        void (async () => {
+          try {
+            await emptyTrashRemote();
+            setTrashed([]);
+            // The undo banner would resurrect a note the user just emptied away.
+            window.clearTimeout(trashTimerRef.current);
+            setTrash(null);
+          } catch (error) {
+            setNotice(error instanceof Error ? error.message : String(error));
+          }
+        })();
+      }, [confirmEmpty]);
+
       const onPaste = useCallback((event) => {
         const files = Array.from(event.clipboardData?.files || []);
         const images = files.filter((file) => file.type.startsWith('image/'));
@@ -2027,23 +2157,58 @@ window.__ModuleLoader__.load({
         setDragging(false);
       }, []);
 
+      /** Apply a markdown edit result and restore focus + selection. */
+      const applyMarkdownEdit = useCallback((result) => {
+        const element = textareaRef.current;
+        const next = withId({ ...editorRef.current, text: result.text, updatedAt: Date.now() });
+        dirtyRef.current = true;
+        updateEditor(next);
+        queueDraft(next);
+        if (next.id) scheduleSave(next);
+        if (element) {
+          element.focus();
+          try {
+            element.setSelectionRange(result.start, result.end);
+          } catch {}
+        }
+      }, [queueDraft, scheduleSave, updateEditor]);
+
       /** Wrap the textarea selection in a markdown marker (toolbar / ⌘B / ⌘I). */
       const wrapSelection = useCallback((marker) => {
         const element = textareaRef.current;
         if (!element) return;
         const start = typeof element.selectionStart === 'number' ? element.selectionStart : element.value.length;
         const end = typeof element.selectionEnd === 'number' ? element.selectionEnd : start;
-        const result = wrapMarkdown(element.value, start, end, marker);
-        const next = withId({ ...editorRef.current, text: result.text, updatedAt: Date.now() });
-        dirtyRef.current = true;
-        updateEditor(next);
-        queueDraft(next);
-        if (next.id) scheduleSave(next);
-        element.focus();
-        try {
-          element.setSelectionRange(result.start, result.end);
-        } catch {}
-      }, [queueDraft, scheduleSave, updateEditor]);
+        applyMarkdownEdit(wrapMarkdown(element.value, start, end, marker));
+      }, [applyMarkdownEdit]);
+
+      /** Toggle a line-level marker (H2 / lists) across the affected lines. */
+      const toggleBlock = useCallback((kind) => {
+        const element = textareaRef.current;
+        if (!element) return;
+        const start = typeof element.selectionStart === 'number' ? element.selectionStart : element.value.length;
+        const end = typeof element.selectionEnd === 'number' ? element.selectionEnd : start;
+        applyMarkdownEdit(toggleLinePrefix(element.value, start, end, kind));
+      }, [applyMarkdownEdit]);
+
+      /**
+       * Auto-grow the textarea with its content (short notes keep the composer
+       * compact). The flex column caps the card and compresses the textarea
+       * back into an internal scroller once the content outgrows the column,
+       * so long-form writing still scrolls in place.
+       */
+      const autoGrow = useCallback(() => {
+        const element = textareaRef.current;
+        if (!element) return;
+        element.style.height = 'auto';
+        element.style.height = `${element.scrollHeight}px`;
+      }, []);
+
+      useLayoutEffect(() => {
+        autoGrow();
+        window.addEventListener('resize', autoGrow);
+        return () => window.removeEventListener('resize', autoGrow);
+      }, [autoGrow, editor.text, previewMode, composerOpen, narrow]);
 
       const onEditorKeyDown = useCallback((event) => {
         if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
@@ -2180,7 +2345,28 @@ window.__ModuleLoader__.load({
             title: t('editor.code'),
             'aria-label': t('editor.code'),
             onClick: () => wrapSelection('`'),
-          }, h(CodeIcon, null))) : null,
+          }, h(CodeIcon, null)),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__mdBtn',
+            title: t('editor.heading'),
+            'aria-label': t('editor.heading'),
+            onClick: () => toggleBlock('heading'),
+          }, h(HeadingIcon, null)),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__mdBtn',
+            title: t('editor.ul'),
+            'aria-label': t('editor.ul'),
+            onClick: () => toggleBlock('ul'),
+          }, h(ListIcon, null)),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__mdBtn',
+            title: t('editor.ol'),
+            'aria-label': t('editor.ol'),
+            onClick: () => toggleBlock('ol'),
+          }, h(ListOrderedIcon, null))) : null,
         h('button', {
           type: 'button',
           className: 'dsh-sp__iconBtn',
@@ -2353,6 +2539,14 @@ window.__ModuleLoader__.load({
               disabled: importing,
               onClick: () => importInputRef.current?.click(),
             }, importing ? t('data.importing') : t('data.import')),
+            trashView && trashed.length > 0 ? h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              'data-danger': confirmEmpty ? 'true' : 'false',
+              title: confirmEmpty ? t('trash.confirmEmpty') : t('trash.emptyAll'),
+              'aria-label': confirmEmpty ? t('trash.confirmEmpty') : t('trash.emptyAll'),
+              onClick: emptyTrash,
+            }, confirmEmpty ? t('trash.confirmEmpty') : t('trash.emptyAll')) : null,
             h('button', {
               type: 'button',
               className: 'dsh-sp__textBtn',
@@ -2436,6 +2630,7 @@ window.__ModuleLoader__.load({
                 note,
                 active: editor.id === note.id,
                 confirming: confirmId === note.id,
+                query,
                 t,
                 onOpen: (target) => { void openNote(target); },
                 onTogglePin: togglePin,
