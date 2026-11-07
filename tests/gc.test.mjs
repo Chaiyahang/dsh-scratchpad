@@ -1,4 +1,4 @@
-import { readdir, writeFile, utimes } from 'node:fs/promises';
+import { readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHarness, assert } from './helpers.mjs';
 
@@ -13,16 +13,14 @@ try {
 
   const filesDir = join(harness.dir, 'scratchpad', 'files');
   await writeFile(join(filesDir, 'orphan-old.png'), Buffer.from([3]));
-  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-  await utimes(join(filesDir, 'orphan-old.png'), twoHoursAgo, twoHoursAgo);
-  await writeFile(join(filesDir, 'orphan-fresh.png'), Buffer.from([4]));
+  await writeFile(join(filesDir, 'orphan-any.png'), Buffer.from([4]));
 
   harness.watchdogs[0]();
   await new Promise((resolve) => setTimeout(resolve, 100));
 
   const entries = (await readdir(filesDir)).sort();
-  assert(!entries.includes('orphan-old.png'), 'an old unreferenced orphan is swept');
-  assert(entries.includes('orphan-fresh.png'), 'a fresh orphan survives the grace window');
+  assert(!entries.includes('orphan-old.png') && !entries.includes('orphan-any.png'),
+    'unreferenced files are swept regardless of age');
   assert(entries.includes(keep.body.attachment.storedName), 'trash-referenced files are kept');
   console.log('gc test passed');
 } finally {

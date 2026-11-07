@@ -6,7 +6,7 @@
  * the Agent tools read and write the same durable store. The client talks to it
  * through the authenticated shared Fetch channel at `/api/scratchpad/*`.
  */
-import { copyFile, link, mkdir, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { copyFile, link, mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import os from 'node:os';
 
@@ -19,8 +19,6 @@ const MAX_LIST_LIMIT = 100;
 const EXPORT_FORMAT = 'dsh-scratchpad';
 const IMPORT_MAX_BYTES = 100 * 1024 * 1024;
 const MAX_IMPORT_NOTES = 5000;
-/** Unreferenced attachment files younger than this are kept (in-flight drafts). */
-const ORPHAN_GRACE_MS = 60 * 60 * 1000;
 /** How often the orphan attachment sweep runs. */
 const GC_INTERVAL_MS = 60 * 60 * 1000;
 const MAX_TAGS = 12;
@@ -531,13 +529,9 @@ export function apply(ctx) {
       } catch {
         return;
       }
-      const cutoff = Date.now() - ORPHAN_GRACE_MS;
       const orphans = [];
       for (const name of entries) {
         if (referenced.has(name)) continue;
-        const info = await stat(join(filesDir, name)).catch(() => null);
-        if (!info || !info.isFile()) continue;
-        if (info.mtimeMs > cutoff) continue;
         orphans.push({ storedName: name });
       }
       if (orphans.length > 0) await removeFiles(orphans);
