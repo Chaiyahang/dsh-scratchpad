@@ -6,7 +6,7 @@
  * the Agent tools read and write the same durable store. The client talks to it
  * through the authenticated shared Fetch channel at `/api/scratchpad/*`.
  */
-import { copyFile, link, mkdir, readdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { copyFile, link, mkdir, readdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import os from 'node:os';
 
@@ -27,6 +27,9 @@ const MAX_TAG_LENGTH = 32;
 const INLINE_IMAGE_TYPES = /^image\/(?:avif|bmp|gif|jpeg|jpg|png|webp|x-icon|vnd\.microsoft\.icon)$/;
 /** How long a soft-deleted note (and its attachment files) stays recoverable. */
 const DELETE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+/** Daily snapshots live under this folder (inside the data directory); this many survive rotation. */
+const SNAPSHOT_DIR = 'snapshots';
+const SNAPSHOT_KEEP = 7;
 
 /** A request-level failure with the HTTP status the channel should report. */
 class HttpError extends Error {
@@ -239,6 +242,7 @@ export function apply(ctx) {
     const body = await readBody(request);
     if (body?.emptyTrash === true) {
       // Empty the trash: hard-delete every soft-deleted note and its files now.
+      await forceSnapshot('pre-empty-trash');
       const attachments = await mutate((state) => {
         const removed = [];
         const kept = [];
@@ -421,6 +425,9 @@ export function apply(ctx) {
     }
     if (stagedNotes.length === 0) throw badRequest('the export contains no importable notes');
 
+    // A merge replaces same-id notes wholesale; keep a snapshot so a bad
+    // import can be rolled back by hand from snapshots/<ts>-pre-import/.
+    await forceSnapshot('pre-import');
     const obsolete = await mutate((state) => {
       const removed = [];
       for (const note of stagedNotes) {
@@ -555,6 +562,89 @@ export function apply(ctx) {
   }
 
   // -------------------------------------------------------------------
+  // Daily snapshots
+  // -------------------------------------------------------------------
+
+  /**
+   * Snapshot the whole store (notes document + every referenced attachment)
+   * into snapshots/<timestamp>/. Attachments are hard linked, so a snapshot
+   * costs near-zero bytes on APFS/ext4 and files hard-deleted later stay
+   * recoverable for as long as the snapshot folder survives rotation.
+   */
+  async function takeSnapshot(label) {
+    return enqueue(async () => {
+      const state = await load();
+      const dir = join(baseDir, SNAPSHOT_DIR, snapshotStamp(label));
+      const snapshotFiles = join(dir, 'files');
+      await mkdir(snapshotFiles, { recursive: true });
+      const body = JSON.stringify({ version: DATA_VERSION, revision: state.revision, notes: state.notes }, null, 2) + '\n';
+      await writeFile(join(dir, 'notes.json'), body, 'utf8');
+      const names = new Set();
+      for (const note of state.notes) {
+        for (const attachment of note.attachments) {
+          names.add(attachment.storedName);
+          if (attachment.thumbName) names.add(attachment.thumbName);
+        }
+      }
+      await Promise.all([...names].map(async (name) => {
+        const from = join(filesDir, name);
+        const to = join(snapshotFiles, name);
+        try {
+          await link(from, to);
+        } catch (error) {
+          if (error?.code === 'ENOENT') return;
+          try {
+            await copyFile(from, to);
+          } catch {}
+        }
+      }));
+      await rotateSnapshots();
+      return dir;
+    });
+  }
+
+  /** Keep only the newest SNAPSHOT_KEEP snapshot folders. */
+  async function rotateSnapshots() {
+    const root = join(baseDir, SNAPSHOT_DIR);
+    let entries;
+    try {
+      entries = await readdir(root);
+    } catch {
+      return;
+    }
+    // Only touch machine-generated names, never a folder a user dropped in.
+    const stale = entries
+      .filter((name) => /^\d{4}-\d{2}-\d{2}T/.test(name))
+      .sort()
+      .reverse()
+      .slice(SNAPSHOT_KEEP);
+    await Promise.all(stale.map((name) => rm(join(root, name), { recursive: true, force: true }).catch(() => {})));
+  }
+
+  /**
+   * One snapshot per calendar day (UTC): skip when the newest snapshot folder
+   * is already from today. Forced snapshots (pre-import etc.) count as today's.
+   */
+  async function ensureDailySnapshot() {
+    let entries;
+    try {
+      entries = await readdir(join(baseDir, SNAPSHOT_DIR));
+    } catch {
+      entries = [];
+    }
+    const newest = entries.filter((name) => /^\d{4}-\d{2}-\d{2}T/.test(name)).sort().pop();
+    if (newest && newest.slice(0, 10) === new Date().toISOString().slice(0, 10)) return;
+    await takeSnapshot();
+  }
+
+  /** Best-effort snapshot before a destructive operation; never blocks it. */
+  function forceSnapshot(label) {
+    return takeSnapshot(label).catch((error) => {
+      ctx.logger?.warn?.('scratchpad: pre-change snapshot failed:', error instanceof Error ? error.message : String(error));
+    });
+  }
+
+  // -------------------------------------------------------------------
   // Agent tools
   // -------------------------------------------------------------------
 
@@ -590,7 +680,7 @@ export function apply(ctx) {
   const tools = [
     {
       name: 'scratchpad_list',
-      description: 'List the notes in the user\'s Scratchpad panel (the sidebar "便签" page), newest first. Use it before answering questions about what the user has jotted down, or to find a note id for scratchpad_read / scratchpad_append / scratchpad_delete. Returns one line per note with its id, a preview, pin state, attachment count and update time.',
+      description: 'List the notes in the user\'s Scratchpad panel (the sidebar "便签" page), newest first. Use it before answering questions about what the user has jotted down, or to find a note id for scratchpad_read / scratchpad_append / scratchpad_delete. For keyword lookup with context snippets prefer scratchpad_search. Returns one line per note with its id, a preview, pin state, attachment count and update time.',
       parameters: {
         type: 'object',
         additionalProperties: false,
@@ -618,6 +708,53 @@ export function apply(ctx) {
         if (matching.length === 0) return state.notes.length === 0 ? 'The scratchpad is empty.' : 'No scratchpad note matches that query.';
         const header = `${state.notes.length} note${state.notes.length === 1 ? '' : 's'} in the scratchpad (showing ${matching.length}):`;
         return [header, ...matching.map((note) => `- ${toolSummary(note)}`)].join('\n');
+      },
+    },
+    {
+      name: 'scratchpad_search',
+      description: 'Search the user\'s Scratchpad notes for keywords and get each matching note with context snippets — the text right around every hit — so relevance is visible without reading notes in full. A note matches when every given keyword appears in its text, tags or attachment names. Use scratchpad_list to browse recent notes, and scratchpad_read to fetch the full text of a hit.',
+      parameters: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['query'],
+        properties: {
+          query: { type: 'string', description: 'Space-separated keywords; a note matches when every keyword is found (case-insensitive).' },
+          tag: { type: 'string', description: 'Only notes carrying this tag (case-insensitive, exact tag).' },
+          limit: { type: 'integer', description: 'Maximum notes to return (1-' + MAX_LIST_LIMIT + ', default ' + DEFAULT_LIST_LIMIT + ').' },
+        },
+      },
+      output: textOutput(),
+      async execute(args, exec) {
+        exec.signal.throwIfAborted();
+        const keywords = (typeof args?.query === 'string' ? args.query : '').toLowerCase().split(/\s+/).filter(Boolean);
+        if (keywords.length === 0) throw new Error('query must contain at least one keyword');
+        const tag = typeof args?.tag === 'string' ? args.tag.trim().toLowerCase() : '';
+        const limit = Math.min(Math.max(Number.isInteger(args?.limit) ? args.limit : DEFAULT_LIST_LIMIT, 1), MAX_LIST_LIMIT);
+        const state = await readState();
+        const matching = state.notes
+          .filter((note) => !note.deletedAt)
+          .filter((note) => tag === '' || note.tags.some((item) => item.toLowerCase() === tag))
+          .filter((note) => keywords.every((keyword) => note.text.toLowerCase().includes(keyword)
+            || note.tags.some((item) => item.toLowerCase().includes(keyword))
+            || note.attachments.some((item) => item.name.toLowerCase().includes(keyword))))
+          .sort((left, right) => right.updatedAt - left.updatedAt);
+        if (matching.length === 0) return 'No scratchpad note matches those keywords.';
+        const shown = Math.min(matching.length, limit);
+        const lines = [matching.length + ' note' + (matching.length === 1 ? '' : 's') + ' matched (' + shown + ' shown):'];
+        for (const note of matching.slice(0, limit)) {
+          const bits = ['[' + note.id + ']', note.pinned ? 'pinned' : null];
+          if (note.tags.length > 0) bits.push(note.tags.map((item) => '#' + item).join(' '));
+          bits.push('(' + note.attachments.length + ' attachment' + (note.attachments.length === 1 ? '' : 's') + ', updated ' + new Date(note.updatedAt).toISOString() + ')');
+          lines.push('- ' + bits.filter(Boolean).join(' '));
+          for (const snippet of searchSnippets(note.text, keywords)) lines.push('  · ' + snippet);
+          for (const item of note.tags.filter((tagItem) => keywords.some((keyword) => tagItem.toLowerCase().includes(keyword)))) {
+            lines.push('  · tag hit: #' + item);
+          }
+          for (const item of note.attachments.filter((file) => keywords.some((keyword) => file.name.toLowerCase().includes(keyword)))) {
+            lines.push('  · attachment hit: ' + item.name);
+          }
+        }
+        return lines.join('\n');
       },
     },
     {
@@ -784,6 +921,7 @@ export function apply(ctx) {
     const sweep = () => {
       void purgeExpired().catch((error) => ctx.logger?.warn?.('scratchpad: purge sweep failed:', error instanceof Error ? error.message : String(error)));
       void sweepOrphans().catch((error) => ctx.logger?.warn?.('scratchpad: orphan sweep failed:', error instanceof Error ? error.message : String(error)));
+      void ensureDailySnapshot().catch((error) => ctx.logger?.warn?.('scratchpad: daily snapshot failed:', error instanceof Error ? error.message : String(error)));
     };
     sweep();
     const sweeper = setInterval(sweep, 60 * 60 * 1000);
@@ -923,6 +1061,44 @@ function sanitizeStore(parsed) {
     revision: Number.isInteger(parsed.revision) ? parsed.revision : 0,
     notes: Array.isArray(parsed.notes) ? parsed.notes.map(readNote).filter(Boolean) : [],
   };
+}
+
+/** Timestamped snapshot folder name; labels make forced snapshots identifiable. */
+function snapshotStamp(label) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  return label ? stamp + '-' + label : stamp;
+}
+
+/**
+ * Context windows around keyword hits in a note's text: at most three snippets,
+ * overlapping windows on one line merged, each trimmed and ellipsized.
+ */
+function searchSnippets(text, keywords) {
+  const lines = String(text).split('\n');
+  const lowered = lines.map((line) => line.toLowerCase());
+  const spans = [];
+  for (const keyword of keywords) {
+    for (let index = 0; index < lines.length; index += 1) {
+      const at = lowered[index].indexOf(keyword);
+      if (at < 0) continue;
+      const from = Math.max(0, at - 40);
+      const to = Math.min(lines[index].length, at + keyword.length + 60);
+      const last = spans[spans.length - 1];
+      if (last && last.index === index && from <= last.to) {
+        last.to = Math.max(last.to, to);
+      } else {
+        spans.push({ index, from, to });
+      }
+      if (spans.length >= 3) return spans.map((span) => snippetOf(lines, span));
+    }
+  }
+  return spans.map((span) => snippetOf(lines, span));
+}
+
+function snippetOf(lines, span) {
+  const source = lines[span.index];
+  const raw = source.slice(span.from, span.to).replace(/\s+/g, ' ').trim();
+  return (span.from > 0 ? '…' : '') + raw + (span.to < source.length ? '…' : '');
 }
 
 /** Move an unreadable document aside, keeping the bytes for manual recovery. */

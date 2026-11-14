@@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
     /** Locale namespace and the `main` key / sidebar id share one identifier. */
     const NS = 'scratchpad';
     /** Keep in sync with package.json; tests/version.test.mjs guards the pair. */
-    const VERSION = '0.2.9';
+    const VERSION = '0.3.0';
     const PANEL_ID = 'scratchpad';
     const PANEL_ORDER = -1;
     const STYLE_ID = '@chaiyahang/dsh-scratchpad/panel.css';
@@ -54,6 +54,11 @@ window.__ModuleLoader__.load({
         'trash.confirmEmpty': 'Sure? Delete all',
         'trash.expiresPrefix': 'auto-deletes in',
         'trash.expiresSuffix': 'days',
+        'todos.title': 'To-dos',
+        'todos.empty': 'No open to-dos. Write "- [ ] something" in any note and it shows up here.',
+        'todos.openGroup': 'Open',
+        'todos.doneGroup': 'Completed',
+        'todos.openNote': 'Open the note',
         'editor.placeholder': 'Jot an idea down…',
         'editor.image': 'Image',
         'editor.file': 'File',
@@ -142,6 +147,11 @@ window.__ModuleLoader__.load({
         'trash.confirmEmpty': '确认全部删除？',
         'trash.expiresPrefix': '剩',
         'trash.expiresSuffix': '天自动清除',
+        'todos.title': '待办',
+        'todos.empty': '没有未完成的待办。在便签里写「- [ ] 事情」，就会汇总到这里。',
+        'todos.openGroup': '未完成',
+        'todos.doneGroup': '已完成',
+        'todos.openNote': '打开便签',
         'editor.placeholder': '随手记点什么…',
         'editor.image': '图片',
         'editor.file': '文件',
@@ -342,6 +352,11 @@ window.__ModuleLoader__.load({
 .dsh-sp__lightbox{position:fixed;inset:0;z-index:60;background:var(--dsw-alias-bg-overlay);display:flex;align-items:center;justify-content:center;padding:44px}
 .dsh-sp__lightboxImg{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;display:block}
 .dsh-sp__lightboxClose{position:absolute;top:14px;right:14px;width:30px;height:30px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.dsh-sp__todoNote{display:flex;flex-direction:column;gap:2px}
+.dsh-sp__todoRef{display:flex;align-items:center;gap:8px;width:100%;border:none;background:transparent;padding:0 0 4px;text-align:left;cursor:pointer;font-family:inherit}
+.dsh-sp__todoRef:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;border-radius:6px}
+.dsh-sp__todoRefText{flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dsh-sp__todoRef:hover .dsh-sp__todoRefText{color:light-dark(#3574f0,#7da4ff)}
 `;
 
     // ---------------------------------------------------------------------
@@ -810,6 +825,25 @@ window.__ModuleLoader__.load({
         .replace(/\*\*([^*]+)\*\*/g, '$1')
         .replace(/`([^`]+)`/g, '$1')
         .replace(/\*([^*]+)\*/g, '$1')).join('\n');
+    }
+
+    const TASK_LINE_PATTERN = /^\s*[-*]\s+\[([ xX])\]\s?(.*)$/;
+
+    /** Every `- [ ]` / `- [x]` task line of a note, in source order. */
+    function collectTasks(note) {
+      const tasks = [];
+      const lines = String(note.text).split('\n');
+      for (let index = 0; index < lines.length; index += 1) {
+        const match = TASK_LINE_PATTERN.exec(lines[index]);
+        if (match !== null) tasks.push({ lineIndex: index, done: match[1].toLowerCase() === 'x', text: match[2] });
+      }
+      return tasks;
+    }
+
+    /** First non-task line of the note, as the group header in the to-do view. */
+    function excerptOf(note) {
+      const first = toPlainExcerpt(note.text).split('\n').find((line) => line.trim() !== '');
+      return first ? (first.length > 60 ? first.slice(0, 60) + '…' : first) : '';
     }
 
     // ---------------------------------------------------------------------
@@ -1287,6 +1321,15 @@ window.__ModuleLoader__.load({
         h('path', { d: 'M8.5 15.5h4.5' }));
     }
 
+    function TasksIcon() {
+      return h(LineIcon, { size: 34 },
+        h('rect', { x: 4, y: 3.5, width: 16, height: 17, rx: 2.5 }),
+        h('path', { d: 'm8 9 1.6 1.6L13 7.2' }),
+        h('path', { d: 'M15.5 10H17' }),
+        h('path', { d: 'm8 15.5 1.6 1.6L13 13.7' }),
+        h('path', { d: 'M15.5 16.5H17' }));
+    }
+
     // ---------------------------------------------------------------------
     // Attachments
     // ---------------------------------------------------------------------
@@ -1523,8 +1566,10 @@ window.__ModuleLoader__.load({
       const [conflict, setConflict] = useState(null);
       /** Last soft-deleted note, kept briefly so the user can undo. */
       const [trash, setTrash] = useState(null);
-      /** Whether the list shows the trash instead of live notes. */
-      const [trashView, setTrashView] = useState(false);
+      /** Which list the feed shows: live notes, the trash, or the to-do roll-up. */
+      const [listView, setListView] = useState('notes');
+      const trashView = listView === 'trash';
+      const todoView = listView === 'todos';
       /** Soft-deleted notes, refreshed alongside the live list. */
       const [trashed, setTrashed] = useState([]);
       /** Narrow windows fold the composer into a one-line entry. */
@@ -1801,6 +1846,45 @@ window.__ModuleLoader__.load({
         queueDraft(next);
         if (next.id) scheduleSave(next);
       }, [queueDraft, scheduleSave, updateEditor]);
+
+      /**
+       * Toggle a task line from the to-do view, where the note may not be open
+       * in the editor. Saves against the version the list last saw; on a race
+       * the toggle is reapplied onto the stored version and retried.
+       */
+      const toggleTaskInNote = useCallback((note, lineIndex) => {
+        const rewrite = (source) => {
+          const lines = source.split('\n');
+          if (lineIndex < 0 || lineIndex >= lines.length) return null;
+          const match = /^(\s*[-*]\s+\[)([ xX])(\].*)$/.exec(lines[lineIndex]);
+          if (match === null) return null;
+          lines[lineIndex] = match[1] + (match[2].toLowerCase() === 'x' ? ' ' : 'x') + match[3];
+          return lines.join('\n');
+        };
+        const attempt = async (target, triesLeft) => {
+          const text = rewrite(target.text);
+          if (text === null) return;
+          try {
+            const body = await saveNoteRemote(Object.assign({}, target, { text, updatedAt: Date.now() }), target.updatedAt);
+            applyToNotes(body.note);
+            revisionRef.current = Math.max(revisionRef.current, body.revision || 0);
+            if (editorRef.current.id === target.id && !dirtyRef.current) {
+              updateEditor(copyOf(body.note));
+              baseRef.current = body.note.updatedAt;
+            }
+            setSaveState('saved');
+          } catch (error) {
+            const stored = error?.status === 409 ? error.body?.note : null;
+            if (stored && triesLeft > 0) {
+              await attempt(stored, triesLeft - 1);
+              return;
+            }
+            setSaveState('error');
+            setNotice(error instanceof Error ? error.message : String(error));
+          }
+        };
+        void attempt(note, 2);
+      }, [applyToNotes, updateEditor]);
 
       const commitTag = useCallback(() => {
         const tag = tagDraft.replace(/\s+/g, ' ').trim().slice(0, 32);
@@ -2301,6 +2385,22 @@ window.__ModuleLoader__.load({
             || note.attachments.some((attachment) => attachment.name.toLowerCase().includes(needle)));
       }, [notes, query, selectedTag]);
 
+      /** Open `- [ ]` count across live notes; the badge on the to-dos tab. */
+      const openTaskCount = useMemo(() => notes.reduce(
+        (total, note) => total + collectTasks(note).filter((task) => !task.done).length,
+        0,
+      ), [notes]);
+
+      /** To-do roll-up groups: one per note that has tasks, newest note first. */
+      const todoGroups = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+        return notes
+          .filter((note) => selectedTag === '' || note.tags.includes(selectedTag))
+          .map((note) => ({ note, tasks: collectTasks(note).filter((task) => needle === '' || task.text.toLowerCase().includes(needle)) }))
+          .filter((group) => group.tasks.length > 0)
+          .sort((left, right) => right.note.updatedAt - left.note.updatedAt);
+      }, [notes, query, selectedTag]);
+
       const statusLabel = (() => {
         if (saveState === 'saving') return t('editor.saving');
         if (saveState === 'saved') return t('editor.saved');
@@ -2524,21 +2624,21 @@ window.__ModuleLoader__.load({
           h('button', { type: 'button', className: 'dsh-sp__textBtn', onClick: undoDelete }, t('panel.undo'))) : null);
         const toolbar = h('div', { className: 'dsh-sp__toolbar' },
           h('div', { className: 'dsh-sp__listHeader' },
-            h('span', null, trashView ? t('trash.title') : t('panel.listTitle')),
-            h('span', null, String(trashView ? trashed.length : visibleNotes.length)),
+            h('span', null, trashView ? t('trash.title') : todoView ? t('todos.title') : t('panel.listTitle')),
+            h('span', null, String(trashView ? trashed.length : todoView ? openTaskCount : visibleNotes.length)),
             h('span', { className: 'dsh-sp__barSpacer' }),
-            trashView ? null : h('a', {
+            listView === 'notes' ? h('a', {
               className: 'dsh-sp__textBtn',
               href: API + '/export?attachments=1',
               title: t('data.exportHint'),
-            }, t('data.export')),
-            trashView ? null : h('button', {
+            }, t('data.export')) : null,
+            listView === 'notes' ? h('button', {
               type: 'button',
               className: 'dsh-sp__textBtn',
               title: t('data.importHint'),
               disabled: importing,
               onClick: () => importInputRef.current?.click(),
-            }, importing ? t('data.importing') : t('data.import')),
+            }, importing ? t('data.importing') : t('data.import')) : null,
             trashView && trashed.length > 0 ? h('button', {
               type: 'button',
               className: 'dsh-sp__textBtn',
@@ -2547,11 +2647,21 @@ window.__ModuleLoader__.load({
               'aria-label': confirmEmpty ? t('trash.confirmEmpty') : t('trash.emptyAll'),
               onClick: emptyTrash,
             }, confirmEmpty ? t('trash.confirmEmpty') : t('trash.emptyAll')) : null,
-            h('button', {
+            listView === 'notes' ? h('button', {
               type: 'button',
               className: 'dsh-sp__textBtn',
-              onClick: () => setTrashView(!trashView),
-            }, trashView ? t('trash.back') : t('trash.title') + ' ' + trashed.length)));
+              onClick: () => setListView('todos'),
+            }, t('todos.title') + ' ' + openTaskCount) : null,
+            listView === 'notes' ? h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              onClick: () => setListView('trash'),
+            }, t('trash.title') + ' ' + trashed.length) : null,
+            listView !== 'notes' ? h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              onClick: () => setListView('notes'),
+            }, t('trash.back')) : null));
         feedChildren.push(toolbar);
         if (allTags.length > 0) {
           feedChildren.push(h('div', {
@@ -2583,12 +2693,12 @@ window.__ModuleLoader__.load({
             event.target.value = '';
           },
         }));
-        const listEmpty = (trashView ? trashed.length === 0 : visibleNotes.length === 0);
+        const listEmpty = trashView ? trashed.length === 0 : todoView ? todoGroups.length === 0 : visibleNotes.length === 0;
         const listArea = [];
         if (listEmpty) {
           listArea.push(h('div', { className: 'dsh-sp__empty' },
-            h('span', { className: 'dsh-sp__emptyIcon' }, h(EmptyIcon, null)),
-            h('span', null, trashView ? t('trash.empty') : query.trim() ? t('panel.noResults') : t('panel.empty'))));
+            h('span', { className: 'dsh-sp__emptyIcon' }, h(todoView ? TasksIcon : EmptyIcon, null)),
+            h('span', null, trashView ? t('trash.empty') : todoView ? t('todos.empty') : query.trim() ? t('panel.noResults') : t('panel.empty'))));
         } else if (trashView) {
           listArea.push(h('div', { className: 'dsh-sp__list' },
             trashed.map((note) => h(TrashCard, {
@@ -2598,6 +2708,41 @@ window.__ModuleLoader__.load({
               onRestore: restoreNote,
               onDeleteForever: deleteForever,
             }))));
+        } else if (todoView) {
+          const groups = todoGroups
+            .map((group) => ({
+              note: group.note,
+              open: group.tasks.filter((task) => !task.done),
+              done: group.tasks.filter((task) => task.done),
+            }))
+            .filter((group) => group.open.length > 0 || group.done.length > 0);
+          const renderGroup = (group, part) => h('article', { key: group.note.id + ':' + part, className: 'dsh-sp__note dsh-sp__todoNote' },
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__todoRef',
+              title: t('todos.openNote'),
+              onClick: () => { void openNote(group.note); },
+            },
+            h('span', { className: 'dsh-sp__todoRefText' }, excerptOf(group.note) || t('note.untitled')),
+            h('time', { className: 'dsh-sp__noteTime', dateTime: new Date(group.note.updatedAt).toISOString() }, formatTime(group.note.updatedAt))),
+            group[part].map((task) => h('div', { key: task.lineIndex, className: 'dsh-sp__mdTask' },
+              h('input', {
+                type: 'checkbox',
+                className: 'dsh-sp__mdCheck',
+                checked: task.done,
+                'aria-label': task.text,
+                onChange: () => toggleTaskInNote(group.note, task.lineIndex),
+              }),
+              h('span', { className: 'dsh-sp__mdTaskText', 'data-done': task.done ? 'true' : 'false' },
+                renderInline(task.text, query.trim())))));
+          if (groups.length > 0) {
+            const withOpen = groups.filter((group) => group.open.length > 0);
+            const withDone = groups.filter((group) => group.done.length > 0);
+            if (withOpen.length > 0) listArea.push(h('div', { className: 'dsh-sp__groupHead' }, t('todos.openGroup')));
+            for (const group of withOpen) listArea.push(renderGroup(group, 'open'));
+            if (withDone.length > 0) listArea.push(h('div', { className: 'dsh-sp__groupHead' }, t('todos.doneGroup')));
+            for (const group of withDone) listArea.push(renderGroup(group, 'done'));
+          }
         } else {
           const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
           const groupLabel = (ts) => {
@@ -2671,7 +2816,7 @@ window.__ModuleLoader__.load({
               onClick: () => { void startDraft(); },
             }, h(PlusIcon, null), t('panel.new'), h('span', { className: 'dsh-sp__jotKbd' }, newKbd || '⌘⇧N'))),
           h('div', { className: 'dsh-sp__cols' },
-            trashView ? null : h('div', { className: 'dsh-sp__composerCol' },
+            listView === 'notes' ? h('div', { className: 'dsh-sp__composerCol' },
               narrow && !composerOpen
                 ? h('button', {
                     type: 'button',
@@ -2679,7 +2824,7 @@ window.__ModuleLoader__.load({
                     onClick: () => setComposerOpen(true),
                   }, h(PlusIcon, null), t('editor.foldNew'), hint ? h('kbd', { className: 'dsh-sp__kbd' }, hint) : null)
                 : composerCard,
-              aboutCard),
+              aboutCard) : null,
             h('div', { className: 'dsh-sp__feedCol' }, feedChildren)),
           preview ? h(Lightbox, { attachment: preview, t, onClose: () => setPreview(null) }) : null));
     }
