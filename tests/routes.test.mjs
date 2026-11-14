@@ -2,7 +2,7 @@ import { createHarness, assert } from './helpers.mjs';
 
 const harness = await createHarness();
 try {
-  assert(harness.routes.size === 6, `one route per path (got ${harness.routes.size})`);
+  assert(harness.routes.size === 7, `one route per path (got ${harness.routes.size})`);
   assert(
     [...harness.routes.get('/api/scratchpad/notes').methods].sort().join(',') === 'GET,POST',
     'notes route carries GET and POST',
@@ -26,7 +26,7 @@ try {
   // A hot reload must patch existing entries instead of failing the batch.
   const warningsBefore = harness.warnings.length;
   harness.reload();
-  assert(harness.routes.size === 6, 'reload keeps exactly six routes');
+  assert(harness.routes.size === 7, 'reload keeps exactly seven routes');
   assert(harness.warnings.length === warningsBefore, 'reload registers without warnings');
   const afterReload = await harness.request('GET', '/api/scratchpad/notes');
   assert(afterReload.status === 200, 'patched route still dispatches after reload');

@@ -30,6 +30,8 @@ const DELETE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 /** Daily snapshots live under this folder (inside the data directory); this many survive rotation. */
 const SNAPSHOT_DIR = 'snapshots';
 const SNAPSHOT_KEEP = 7;
+/** Prior texts kept per note, newest first; the file lives outside notes.json. */
+const MAX_NOTE_HISTORY = 10;
 
 /** A request-level failure with the HTTP status the channel should report. */
 class HttpError extends Error {
@@ -56,6 +58,9 @@ export function apply(ctx) {
    * just-dropped thumbnail working during the debounce before the note saves.
    */
   const recentUploads = new Map();
+  /** Per-note prior texts, keyed by note id. Derived data — no .bak rotation. */
+  const historyFile = join(baseDir, 'history.json');
+  let historyCache = null;
 
   // -------------------------------------------------------------------
   // Store
@@ -145,6 +150,77 @@ export function apply(ctx) {
   }
 
   // -------------------------------------------------------------------
+  // Note history
+  // -------------------------------------------------------------------
+
+  async function loadHistory() {
+    if (historyCache) return historyCache;
+    try {
+      const parsed = JSON.parse(await readFile(historyFile, 'utf8'));
+      historyCache = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+        && parsed.entries !== null && typeof parsed.entries === 'object' && !Array.isArray(parsed.entries)
+        ? parsed
+        : { version: 1, entries: {} };
+    } catch {
+      historyCache = { version: 1, entries: {} };
+    }
+    return historyCache;
+  }
+
+  async function writeHistory() {
+    const body = JSON.stringify(historyCache) + '\n';
+    const temp = `${historyFile}.${process.pid}.tmp`;
+    await writeFile(temp, body, 'utf8');
+    await rename(temp, historyFile);
+  }
+
+  /**
+   * Push the outgoing text of a note onto its history. Called INSIDE the
+   * mutation queue (never enqueue from here — that would deadlock), and its
+   * own failures are logged, never allowed to fail the save itself.
+   */
+  async function recordHistory(note) {
+    if (!note || typeof note.id !== 'string' || typeof note.text !== 'string') return;
+    try {
+      const doc = await loadHistory();
+      const entries = doc.entries[note.id] || (doc.entries[note.id] = []);
+      entries.unshift({ text: note.text, updatedAt: note.updatedAt });
+      if (entries.length > MAX_NOTE_HISTORY) entries.length = MAX_NOTE_HISTORY;
+      await writeHistory();
+    } catch (error) {
+      ctx.logger?.warn?.('scratchpad: could not record note history:', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /** Forget the history of ids whose notes are gone for good. Same queue rules. */
+  async function dropHistory(ids) {
+    if (ids.length === 0) return;
+    try {
+      const doc = await loadHistory();
+      let changed = false;
+      for (const id of ids) {
+        if (doc.entries[id]) {
+          delete doc.entries[id];
+          changed = true;
+        }
+      }
+      if (changed) await writeHistory();
+    } catch (error) {
+      ctx.logger?.warn?.('scratchpad: could not prune note history:', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /** Sweep history of ids that no longer exist anywhere in the store. */
+  async function pruneHistory() {
+    await enqueue(async () => {
+      const state = await load();
+      const doc = await loadHistory();
+      const alive = new Set(state.notes.map((note) => note.id));
+      await dropHistory(Object.keys(doc.entries).filter((id) => !alive.has(id)));
+    });
+  }
+
+  // -------------------------------------------------------------------
   // HTTP helpers
   // -------------------------------------------------------------------
 
@@ -214,7 +290,7 @@ export function apply(ctx) {
     const baseUpdatedAt = Number.isFinite(body?.baseUpdatedAt) ? Math.round(body.baseUpdatedAt) : null;
     let stored = null;
     let revision = 0;
-    await mutate((state) => {
+    await mutate(async (state) => {
       const index = state.notes.findIndex((item) => item.id === note.id);
       if (index < 0) {
         state.notes.push(note);
@@ -225,6 +301,7 @@ export function apply(ctx) {
         stored = state.notes[index];
         return false;
       }
+      if (state.notes[index].text !== note.text) await recordHistory(state.notes[index]);
       state.notes[index] = note;
       revision = state.revision + 1;
     });
@@ -243,6 +320,7 @@ export function apply(ctx) {
     if (body?.emptyTrash === true) {
       // Empty the trash: hard-delete every soft-deleted note and its files now.
       await forceSnapshot('pre-empty-trash');
+      const removedIds = [];
       const attachments = await mutate((state) => {
         const removed = [];
         const kept = [];
@@ -251,22 +329,27 @@ export function apply(ctx) {
           else kept.push(note);
         }
         if (removed.length === 0) return [];
+        for (const note of removed) removedIds.push(note.id);
         state.notes = kept;
         return removed.flatMap((note) => note.attachments);
       });
+      await dropHistory(removedIds);
       await removeFiles(attachments);
       return json({ ok: true });
     }
     const id = typeof body?.id === 'string' ? body.id : '';
     if (!id) throw badRequest('missing note id');
+    const removedIds = [];
     if (body?.permanent === true) {
       // Hard delete from the trash view: drop the document and its files now.
       const attachments = await mutate((state) => {
         const index = state.notes.findIndex((item) => item.id === id);
         if (index < 0) return [];
         const [removed] = state.notes.splice(index, 1);
+        removedIds.push(removed.id);
         return removed.attachments;
       });
+      await dropHistory(removedIds);
       await removeFiles(attachments);
       return json({ ok: true });
     }
@@ -285,6 +368,7 @@ export function apply(ctx) {
     const state = await readState();
     const cutoff = Date.now() - DELETE_RETENTION_MS;
     if (!state.notes.some((note) => note.deletedAt && note.deletedAt <= cutoff)) return;
+    const removedIds = [];
     const expired = await mutate((current) => {
       const removed = [];
       const kept = [];
@@ -293,10 +377,14 @@ export function apply(ctx) {
         else kept.push(note);
       }
       if (removed.length === 0) return false;
+      for (const note of removed) removedIds.push(note.id);
       current.notes = kept;
       return removed.flatMap((note) => note.attachments);
     });
-    if (expired !== false) await removeFiles(expired);
+    if (expired !== false) {
+      await dropHistory(removedIds);
+      await removeFiles(expired);
+    }
   }
 
   async function handleUpload(request) {
@@ -428,7 +516,7 @@ export function apply(ctx) {
     // A merge replaces same-id notes wholesale; keep a snapshot so a bad
     // import can be rolled back by hand from snapshots/<ts>-pre-import/.
     await forceSnapshot('pre-import');
-    const obsolete = await mutate((state) => {
+    const obsolete = await mutate(async (state) => {
       const removed = [];
       for (const note of stagedNotes) {
         const index = state.notes.findIndex((item) => item.id === note.id);
@@ -442,6 +530,7 @@ export function apply(ctx) {
         const next = note.attachments.length === 0 && current.attachments.length > 0
           ? { ...note, attachments: current.attachments }
           : note;
+        if (current.text !== next.text) await recordHistory(current);
         if (next.attachments !== current.attachments) removed.push(...current.attachments);
         state.notes[index] = next;
       }
@@ -449,6 +538,17 @@ export function apply(ctx) {
     });
     await removeFiles(obsolete);
     return json({ ok: true, imported: stagedNotes.length, skipped: rawNotes.length - stagedNotes.length });
+  }
+
+  /** Earlier texts of one note, newest first. */
+  async function handleNoteHistory(request) {
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id') || '';
+    if (!id) throw badRequest('missing note id');
+    const state = await readState();
+    if (!state.notes.some((note) => note.id === id)) return json({ ok: true, history: [] });
+    const doc = await loadHistory();
+    return json({ ok: true, history: doc.entries[id] || [] });
   }
 
   async function handleFile(request) {
@@ -481,14 +581,15 @@ export function apply(ctx) {
         return new Response('not found', { status: 404 });
       }
     }
-    // Inline only what a browser renders without running code — svg, html, pdf
-    // and friends are opaque bytes that download instead of rendering, so a
-    // hostile upload (or import) can never execute script in the app origin.
-    // The sandbox CSP is a second belt: even a mistyped document renders with
-    // no scripting and a unique origin.
+    // Inline only what a browser renders without running code — bitmaps, plus
+    // PDF for the browser's own viewer. svg/html and friends stay opaque bytes
+    // that download instead of rendering, so a hostile upload (or import) can
+    // never execute script in the app origin. The sandbox CSP is a second
+    // belt: even a mistyped document renders with no scripting and a unique
+    // origin.
     const servingThumb = requestedThumb && servedName === attachment.thumbName;
     const servedType = servingThumb ? 'image/webp' : attachment.type;
-    const inline = INLINE_IMAGE_TYPES.test(servedType) && url.searchParams.get('download') !== '1';
+    const inline = (INLINE_IMAGE_TYPES.test(servedType) || servedType === 'application/pdf') && url.searchParams.get('download') !== '1';
     return new Response(bytes, {
       status: 200,
       headers: {
@@ -817,6 +918,7 @@ export function apply(ctx) {
           createdAt: now,
           updatedAt: now,
           attachments: [],
+          source: 'agent',
         };
         await mutate((state) => {
           state.notes.push(note);
@@ -844,11 +946,13 @@ export function apply(ctx) {
         if (addition.trim() === '') throw new Error('text must not be empty');
         const state = await readState();
         if (!findNote(state, id)) return `No scratchpad note with id "${id}". Call scratchpad_list to see the available notes.`;
-        await mutate((current) => {
+        await mutate(async (current) => {
           const note = findNote(current, id);
           if (!note) return;
+          await recordHistory(note);
           note.text = note.text.trimEnd() === '' ? addition : `${note.text.trimEnd()}\n${addition}`;
           note.updatedAt = Date.now();
+          note.source = 'agent';
         });
         const updated = findNote(await readState(), id);
         return `Appended to scratchpad note ${id} (${updated ? updated.text.length : 0} characters now).`;
@@ -874,12 +978,14 @@ export function apply(ctx) {
         const text = typeof args?.text === 'string' ? args.text.slice(0, MAX_TEXT_LENGTH) : '';
         const state = await readState();
         if (!findNote(state, id)) return `No scratchpad note with id "${id}". Call scratchpad_list to see the available notes.`;
-        await mutate((current) => {
+        await mutate(async (current) => {
           const note = findNote(current, id);
           if (!note) return;
+          if (note.text !== text) await recordHistory(note);
           note.text = text;
           if (Array.isArray(args?.tags)) note.tags = readTags(args.tags);
           note.updatedAt = Date.now();
+          note.source = 'agent';
         });
         return `Updated scratchpad note ${id} (${text.length} characters).`;
       },
@@ -922,6 +1028,7 @@ export function apply(ctx) {
       void purgeExpired().catch((error) => ctx.logger?.warn?.('scratchpad: purge sweep failed:', error instanceof Error ? error.message : String(error)));
       void sweepOrphans().catch((error) => ctx.logger?.warn?.('scratchpad: orphan sweep failed:', error instanceof Error ? error.message : String(error)));
       void ensureDailySnapshot().catch((error) => ctx.logger?.warn?.('scratchpad: daily snapshot failed:', error instanceof Error ? error.message : String(error)));
+      void pruneHistory().catch((error) => ctx.logger?.warn?.('scratchpad: history prune failed:', error instanceof Error ? error.message : String(error)));
     };
     sweep();
     const sweeper = setInterval(sweep, 60 * 60 * 1000);
@@ -939,6 +1046,7 @@ export function apply(ctx) {
       const definitions = [
         { path: `${API}/notes`, handlers: { GET: handleList, POST: handleSave } },
         { path: `${API}/notes/delete`, handlers: { POST: handleDeleteNote } },
+        { path: `${API}/notes/history`, handlers: { GET: handleNoteHistory } },
         { path: `${API}/files`, handlers: { GET: handleFile, POST: handleUpload } },
         { path: `${API}/files/delete`, handlers: { POST: handleDeleteFile } },
         { path: `${API}/export`, handlers: { GET: handleExport } },
@@ -1123,6 +1231,7 @@ function readNote(input) {
     updatedAt: toTime(input.updatedAt),
     deletedAt: Number.isFinite(input.deletedAt) && input.deletedAt > 0 ? Math.round(input.deletedAt) : 0,
     attachments,
+    source: input.source === 'agent' ? 'agent' : null,
   };
 }
 
@@ -1132,5 +1241,7 @@ function writeNote(input) {
   if (note === null) throw new HttpError(400, 'note is malformed');
   // Client saves are always live; only the delete routes soft-delete.
   note.deletedAt = 0;
+  // Every panel save is user-authored: the Agent badge tracks the last writer.
+  note.source = null;
   return note;
 }

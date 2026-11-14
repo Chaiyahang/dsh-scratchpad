@@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
     /** Locale namespace and the `main` key / sidebar id share one identifier. */
     const NS = 'scratchpad';
     /** Keep in sync with package.json; tests/version.test.mjs guards the pair. */
-    const VERSION = '0.3.0';
+    const VERSION = '0.4.0';
     const PANEL_ID = 'scratchpad';
     const PANEL_ORDER = -1;
     const STYLE_ID = '@chaiyahang/dsh-scratchpad/panel.css';
@@ -59,6 +59,11 @@ window.__ModuleLoader__.load({
         'todos.openGroup': 'Open',
         'todos.doneGroup': 'Completed',
         'todos.openNote': 'Open the note',
+        'history.title': 'History',
+        'history.open': 'Version history',
+        'history.restore': 'Restore',
+        'history.empty': 'No earlier versions yet.',
+        'history.close': 'Close',
         'editor.placeholder': 'Jot an idea down…',
         'editor.image': 'Image',
         'editor.file': 'File',
@@ -80,6 +85,7 @@ window.__ModuleLoader__.load({
         'editor.heading': 'Heading',
         'editor.ul': 'Bulleted list',
         'editor.ol': 'Numbered list',
+        'editor.table': 'Table',
         'editor.mdGroup': 'Markdown formatting',
         'editor.remove': 'Remove attachment',
         'note.pin': 'Pin note',
@@ -152,6 +158,11 @@ window.__ModuleLoader__.load({
         'todos.openGroup': '未完成',
         'todos.doneGroup': '已完成',
         'todos.openNote': '打开便签',
+        'history.title': '历史版本',
+        'history.open': '查看历史版本',
+        'history.restore': '恢复此版本',
+        'history.empty': '还没有更早的版本。',
+        'history.close': '关闭',
         'editor.placeholder': '随手记点什么…',
         'editor.image': '图片',
         'editor.file': '文件',
@@ -173,6 +184,7 @@ window.__ModuleLoader__.load({
         'editor.heading': '标题',
         'editor.ul': '无序列表',
         'editor.ol': '有序列表',
+        'editor.table': '表格',
         'editor.mdGroup': 'Markdown 格式',
         'editor.remove': '移除附件',
         'note.pin': '置顶',
@@ -357,6 +369,15 @@ window.__ModuleLoader__.load({
 .dsh-sp__todoRef:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;border-radius:6px}
 .dsh-sp__todoRefText{flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dsh-sp__todoRef:hover .dsh-sp__todoRefText{color:light-dark(#3574f0,#7da4ff)}
+.dsh-sp__agentFlag{flex:none;display:inline-flex;align-items:center;font-size:10.5px;line-height:1.5;color:light-dark(#7c5cd6,#a88fff);border:1px solid currentColor;border-radius:999px;padding:0 6px}
+.dsh-sp__history{flex:0 1 auto;min-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.dsh-sp__historyItem{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 10px;background:var(--dsw-alias-bg-layer-2)}
+.dsh-sp__historyMeta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
+.dsh-sp__historyText{margin-top:2px;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.dsh-sp__mdTableWrap{margin:0 0 8px;overflow-x:auto}
+.dsh-sp__mdTable{border-collapse:collapse;font-size:12.5px;line-height:1.55}
+.dsh-sp__mdTable th,.dsh-sp__mdTable td{border:1px solid var(--dsw-alias-border-l1);padding:3px 8px;text-align:left;vertical-align:top;word-break:break-word}
+.dsh-sp__mdTable th{background:var(--dsw-alias-bg-layer-2);font-weight:600}
 `;
 
     // ---------------------------------------------------------------------
@@ -674,10 +695,27 @@ window.__ModuleLoader__.load({
       return nodes;
     }
 
+    /** Split a markdown table row into trimmed cells, honoring \| escapes. */
+    function splitTableRow(row) {
+      return row.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split(/(?<!\\)\|/).map((cellText) => cellText.replace(/\\\|/g, '|').trim());
+    }
+
+    /** GFM column alignment from a separator cell: :---, :---:, ---:. */
+    function tableAlign(mark) {
+      const spec = String(mark || '').trim();
+      const left = spec.startsWith(':');
+      const right = spec.endsWith(':');
+      if (left && right) return { textAlign: 'center' };
+      if (right) return { textAlign: 'right' };
+      if (left) return { textAlign: 'left' };
+      return null;
+    }
+
     /**
      * Block rendering for notes. Supports headings (#..###), unordered and
-     * ordered lists, task items (`- [ ]` / `- [x]`), fenced code, blockquotes and
-     * paragraphs. Task boxes call `onToggleTask(lineIndex)` with the raw source line.
+     * ordered lists, task items (`- [ ]` / `- [x]`), fenced code, blockquotes,
+     * GFM tables and paragraphs. Task boxes call `onToggleTask(lineIndex)`
+     * with the raw source line.
      */
     function renderMarkdown(text, onToggleTask, taskLabel) {
       const lines = String(text).split('\n');
@@ -726,6 +764,26 @@ window.__ModuleLoader__.load({
           i += 1;
           continue;
         }
+        const tableHeader = /^\s*\|(.+)\|\s*$/.exec(line);
+        if (tableHeader !== null && i + 1 < lines.length
+          && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i + 1]) && lines[i + 1].includes('-')) {
+          const start = i;
+          const headerCells = splitTableRow(tableHeader[1]);
+          const alignCells = splitTableRow(lines[i + 1]);
+          i += 2;
+          const bodyRows = [];
+          while (i < lines.length && /^\s*\|/.test(lines[i])) {
+            bodyRows.push(splitTableRow(lines[i]));
+            i += 1;
+          }
+          const alignFor = (index) => tableAlign(alignCells[index]);
+          blocks.push(h('div', { key: `tbl${start}`, className: 'dsh-sp__mdTableWrap' },
+            h('table', { className: 'dsh-sp__mdTable' },
+              h('thead', null, h('tr', null, headerCells.map((cellText, index) => h('th', { key: index, style: alignFor(index) }, renderInline(cellText))))),
+              h('tbody', null, bodyRows.map((row, rowIndex) => h('tr', { key: rowIndex },
+                row.map((cellText, index) => h('td', { key: index, style: alignFor(index) }, renderInline(cellText)))))))));
+          continue;
+        }
         if (/^\s*[-*]\s+/.test(line)) {
           const items = [];
           const start = i;
@@ -770,6 +828,223 @@ window.__ModuleLoader__.load({
         blocks.push(h('p', { key: `p${start}`, className: 'dsh-sp__mdP' }, renderInline(paragraph.join('\n'))));
       }
       return blocks;
+    }
+
+    const HTML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ' };
+
+    function decodeEntities(text) {
+      return String(text).replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (entity, body) => {
+        if (body[0] === '#') {
+          const code = (body[1] === 'x' || body[1] === 'X') ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+          return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+        }
+        const named = HTML_ENTITIES[body.toLowerCase()];
+        return named !== undefined ? named : entity;
+      });
+    }
+
+    function attributeOf(attrs, name) {
+      const match = new RegExp(name + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|([^\\s>]+))', 'i').exec(attrs || '');
+      if (match === null) return '';
+      return match[1] !== undefined ? match[1] : match[2] !== undefined ? match[2] : match[3];
+    }
+
+    /**
+     * Convert clipboard HTML to Markdown; null when the HTML carries no real
+     * formatting (those pastes keep the browser's plain-text default). A small
+     * self-contained tokenizer — no DOMParser — so it runs and tests in Node:
+     * headings, lists, tables, fenced code, blockquotes, links, images and
+     * inline marks; anything unrecognized keeps its text.
+     */
+    function htmlToMarkdown(html) {
+      const source = String(html).replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, '').trim();
+      if (source === '' || source.length > 500000) return null;
+      if (!/<(?:h[1-6]|b[\s>]|strong|i[\s>]|em[\s>]|u[\s>]|s[\s>]|strike|del[\s>]|ul[\s>]|ol[\s>]|li[\s>]|table[\s>]|pre[\s>]|blockquote|a[\s>]|img[\s>]|br[\s>])/i.test(source)) return null;
+
+      const blocks = [];
+      let inline = '';
+      let quoteDepth = 0;
+      let preText = null;
+      let headingMark = null;
+      let anchor = null;
+      const lists = [];
+      let table = null;
+      let row = null;
+      let cellTag = null;
+
+      const squeeze = (text) => text.replace(/\s+/g, ' ');
+      const emit = () => {
+        const text = inline.trim();
+        inline = '';
+        if (text === '') return;
+        const parts = text.split('\n').map((part) => part.trim()).filter((part) => part !== '');
+        const top = lists[lists.length - 1];
+        for (let index = 0; index < parts.length; index += 1) {
+          if (top) {
+            const pad = '  '.repeat(lists.length - 1);
+            blocks.push(index === 0
+              ? pad + (top.ordered ? top.index + '. ' : '- ') + parts[index]
+              : pad + '  ' + parts[index]);
+          } else {
+            blocks.push('> '.repeat(quoteDepth) + parts[index]);
+          }
+        }
+        if (top && parts.length > 0) lists[lists.length - 1].index += 1;
+        if (headingMark !== null && lists.length === 0) {
+          const last = blocks.length - 1;
+          blocks[last] = headingMark + ' ' + blocks[last];
+          headingMark = null;
+        }
+      };
+
+      const renderTable = (data) => {
+        const width = Math.max(1, ...data.rows.map((item) => item.cells.length));
+        const line = (cells) => '| ' + cells.map((item) => item.text.replace(/\|/g, '\\|'))
+          .concat(Array(Math.max(0, width - cells.length)).fill(''))
+          .join(' | ') + ' |';
+        const out = [line(data.rows[0].cells), '| ' + Array(width).fill('---').join(' | ') + ' |'];
+        for (let index = 1; index < data.rows.length; index += 1) out.push(line(data.rows[index].cells));
+        return out;
+      };
+
+      const pushText = (raw) => {
+        if (raw === '') return;
+        if (preText !== null) {
+          preText += decodeEntities(raw);
+          return;
+        }
+        if (table !== null && cellTag === null) return;
+        inline += squeeze(decodeEntities(raw));
+      };
+
+      const tagPattern = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g;
+      let cursor = 0;
+      let match;
+      while ((match = tagPattern.exec(source)) !== null) {
+        pushText(source.slice(cursor, match.index));
+        cursor = match.index + match[0].length;
+        const tag = match[1].toLowerCase();
+        const closing = match[0][1] === '/';
+        const attrs = match[2] || '';
+        if (preText !== null && !(closing && tag === 'pre')) continue;
+        if (closing) {
+          switch (tag) {
+            case 'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6':
+            case 'p': case 'div':
+              emit();
+              blocks.push('');
+              break;
+            case 'ul': case 'ol':
+              emit();
+              lists.pop();
+              if (lists.length === 0) blocks.push('');
+              break;
+            case 'li':
+              emit();
+              break;
+            case 'blockquote':
+              emit();
+              quoteDepth = Math.max(0, quoteDepth - 1);
+              if (quoteDepth === 0) blocks.push('');
+              break;
+            case 'strong': case 'b': inline += '**'; break;
+            case 'em': case 'i': inline += '*'; break;
+            case 'del': case 's': case 'strike': inline += '~~'; break;
+            case 'code': inline += '`'; break;
+            case 'a': {
+              const at = anchor ? anchor.at : 0;
+              const href = anchor ? anchor.href : '';
+              const text = inline.slice(at);
+              inline = inline.slice(0, at);
+              anchor = null;
+              inline += /^(https?:\/\/|mailto:)/i.test(href) && text.trim() !== '' ? '[' + text + '](' + href + ')' : text;
+              break;
+            }
+            case 'td': case 'th':
+              if (table !== null && row !== null) row.cells.push({ text: squeeze(inline).trim(), header: cellTag === 'th' });
+              inline = '';
+              cellTag = null;
+              break;
+            case 'tr':
+              if (table !== null && row !== null && row.cells.length > 0) table.rows.push(row);
+              row = null;
+              break;
+            case 'table':
+              if (table !== null && table.rows.length > 0) {
+                blocks.push(...renderTable(table));
+                blocks.push('');
+              }
+              table = null;
+              break;
+            default: break;
+          }
+        } else {
+          switch (tag) {
+            case 'h1': case 'h2': case 'h3': case 'h4': case 'h5': case 'h6':
+              emit();
+              headingMark = '#'.repeat(Math.min(Number(tag[1]), 3));
+              break;
+            case 'ul':
+              emit();
+              lists.push({ ordered: false, index: 1 });
+              break;
+            case 'ol':
+              emit();
+              lists.push({ ordered: true, index: 1 });
+              break;
+            case 'blockquote':
+              emit();
+              quoteDepth += 1;
+              break;
+            case 'table':
+              emit();
+              table = { rows: [] };
+              break;
+            case 'tr':
+              if (table !== null) row = { cells: [] };
+              break;
+            case 'td': case 'th':
+              cellTag = tag;
+              inline = '';
+              break;
+            case 'pre':
+              emit();
+              preText = '';
+              break;
+            case 'a':
+              anchor = { href: attributeOf(attrs, 'href'), at: inline.length };
+              break;
+            case 'img': {
+              const src = attributeOf(attrs, 'src');
+              const alt = squeeze(decodeEntities(attributeOf(attrs, 'alt')));
+              if (/^https?:\/\//i.test(src)) inline += '[' + (alt || 'image') + '](' + src + ')';
+              break;
+            }
+            case 'br':
+              inline += cellTag !== null ? ' ' : '\n';
+              break;
+            case 'hr':
+              emit();
+              blocks.push('---');
+              blocks.push('');
+              break;
+            case 'strong': case 'b': inline += '**'; break;
+            case 'em': case 'i': inline += '*'; break;
+            case 'del': case 's': case 'strike': inline += '~~'; break;
+            case 'code': inline += '`'; break;
+            default: break;
+          }
+        }
+      }
+      pushText(source.slice(cursor));
+      emit();
+      if (preText !== null) {
+        blocks.push('```\n' + preText.replace(/\n+$/, '') + '\n```');
+        preText = null;
+      }
+      if (table !== null && table.rows.length > 0) blocks.push(...renderTable(table));
+      const markdown = blocks.join('\n').replace(/\n{3,}/g, '\n\n').replace(/^\n+|\n+$/g, '');
+      return markdown === '' ? null : markdown + '\n';
     }
 
     /** One-line-ish card excerpt: markers become glyphs instead of raw syntax. */
@@ -1321,6 +1596,14 @@ window.__ModuleLoader__.load({
         h('path', { d: 'm8 12.2 2.6 2.6L16.4 9' }));
     }
 
+    function TableIcon() {
+      return h(LineIcon, { size: 15 },
+        h('rect', { x: 3.5, y: 4.5, width: 17, height: 15, rx: 2 }),
+        h('path', { d: 'M3.5 9.5h17' }),
+        h('path', { d: 'M3.5 14.5h17' }),
+        h('path', { d: 'M12 4.5v15' }));
+    }
+
     function EmptyIcon() {
       return h(LineIcon, { size: 34 },
         h('rect', { x: 4.5, y: 3, width: 15, height: 18, rx: 2.5 }),
@@ -1351,12 +1634,19 @@ window.__ModuleLoader__.load({
           title: label,
           onClick: () => onOpen(attachment),
         }, h('img', { className: 'dsh-sp__tileImg', src: attachmentUrl(attachment.id, false, 'thumb'), alt: '', loading: 'lazy', decoding: 'async' }))
-        : h('a', {
-          className: 'dsh-sp__tileOpen',
-          href: attachmentUrl(attachment.id, true),
-          download: attachment.name,
-          title: label,
-        }, h('span', { className: 'dsh-sp__tileExt' }, extensionOf(attachment.name)));
+        : attachment.type === 'application/pdf'
+          ? h('button', {
+            type: 'button',
+            className: 'dsh-sp__tileOpen',
+            title: label,
+            onClick: () => { try { window.open(attachmentUrl(attachment.id), '_blank', 'noopener,noreferrer'); } catch {} },
+          }, h('span', { className: 'dsh-sp__tileExt' }, extensionOf(attachment.name)))
+          : h('a', {
+            className: 'dsh-sp__tileOpen',
+            href: attachmentUrl(attachment.id, true),
+            download: attachment.name,
+            title: label,
+          }, h('span', { className: 'dsh-sp__tileExt' }, extensionOf(attachment.name)));
       return h('div', { className: 'dsh-sp__tile' },
         body,
         h('button', {
@@ -1477,6 +1767,7 @@ window.__ModuleLoader__.load({
       return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false' },
         h('div', { className: 'dsh-sp__noteTop' },
           h('time', { className: 'dsh-sp__noteTime', dateTime: new Date(note.updatedAt).toISOString() }, formatTime(note.updatedAt)),
+          note.source === 'agent' ? h('span', { className: 'dsh-sp__agentFlag' }, 'Agent') : null,
           note.pinned ? h('span', { className: 'dsh-sp__pinnedFlag' }, h(PinIcon, null), t('note.pinnedFlag')) : null,
           h('div', { className: 'dsh-sp__noteTools' },
             h('button', {
@@ -1593,6 +1884,10 @@ window.__ModuleLoader__.load({
       const [importing, setImporting] = useState(false);
       const [tagDraft, setTagDraft] = useState('');
       const [selectedTag, setSelectedTag] = useState('');
+      /** Whether the editor shows the note's earlier versions. */
+      const [historyOpen, setHistoryOpen] = useState(false);
+      /** Versions from the Host; null while loading. */
+      const [historyItems, setHistoryItems] = useState(null);
 
       const editorRef = useRef(editor);
       /** updatedAt of the version this editor last synced with the Host; 0 = no base. */
@@ -1983,6 +2278,7 @@ window.__ModuleLoader__.load({
         updateEditor(emptyEditor());
         setSaveState('idle');
         setPreviewMode(false);
+        setHistoryOpen(false);
         setTagDraft('');
         setComposerOpen(true);
         window.setTimeout(() => textareaRef.current?.focus(), 0);
@@ -2042,6 +2338,7 @@ window.__ModuleLoader__.load({
         if (saved) clearDraft();
         dirtyRef.current = false;
         setConflict(null);
+        setHistoryOpen(false);
         updateEditor(copyOf(note));
         baseRef.current = note.updatedAt;
         setSaveState('saved');
@@ -2223,14 +2520,6 @@ window.__ModuleLoader__.load({
         })();
       }, [confirmEmpty]);
 
-      const onPaste = useCallback((event) => {
-        const files = Array.from(event.clipboardData?.files || []);
-        const images = files.filter((file) => file.type.startsWith('image/'));
-        if (images.length === 0) return;
-        event.preventDefault();
-        void addFiles(images);
-      }, [addFiles]);
-
       const onDrop = useCallback((event) => {
         if (!event.dataTransfer?.files?.length) return;
         event.preventDefault();
@@ -2282,6 +2571,72 @@ window.__ModuleLoader__.load({
         const end = typeof element.selectionEnd === 'number' ? element.selectionEnd : start;
         applyMarkdownEdit(toggleLinePrefix(element.value, start, end, kind));
       }, [applyMarkdownEdit]);
+
+      /** Insert an empty 3-column table skeleton at the caret. */
+      const insertTable = useCallback(() => {
+        const element = textareaRef.current;
+        const value = element ? element.value : editorRef.current.text;
+        const start = element && typeof element.selectionStart === 'number' ? element.selectionStart : value.length;
+        const end = element && typeof element.selectionEnd === 'number' ? element.selectionEnd : start;
+        const before = value.slice(0, start);
+        const lead = before !== '' && !before.endsWith('\n') ? '\n' : '';
+        const skeleton = '|  |  |  |\n| --- | --- | --- |\n|  |  |  |';
+        const head = before + lead;
+        applyMarkdownEdit({ text: head + skeleton + value.slice(end), start: head.length + skeleton.length, end: head.length + skeleton.length });
+      }, [applyMarkdownEdit]);
+
+      /** Fetch and show the earlier texts the Host kept for the open note. */
+      const openHistory = useCallback(async () => {
+        const id = editorRef.current.id;
+        if (!id) return;
+        setHistoryOpen(true);
+        setHistoryItems(null);
+        try {
+          const body = await apiJson(API + '/notes/history?id=' + encodeURIComponent(id));
+          setHistoryItems(Array.isArray(body.history) ? body.history : []);
+        } catch (error) {
+          setHistoryItems([]);
+          setNotice(error instanceof Error ? error.message : String(error));
+        }
+      }, []);
+
+      /** Put an old version back into the editor; the normal save flow takes over. */
+      const restoreHistoryVersion = useCallback((entry) => {
+        const current = editorRef.current;
+        if (!current.id || entry === null || typeof entry !== 'object' || typeof entry.text !== 'string') return;
+        const next = { ...current, text: entry.text, updatedAt: Date.now() };
+        dirtyRef.current = true;
+        updateEditor(next);
+        queueDraft(next);
+        scheduleSave(next);
+        setPreviewMode(false);
+        setHistoryOpen(false);
+      }, [queueDraft, scheduleSave, updateEditor]);
+
+      /**
+       * Paste: images upload as attachments; rich HTML converts to Markdown
+       * (htmlToMarkdown declines plain-looking HTML, which then pastes as
+       * usual through the browser default).
+       */
+      const onPaste = useCallback((event) => {
+        const files = Array.from(event.clipboardData?.files || []);
+        const images = files.filter((file) => file.type.startsWith('image/'));
+        if (images.length > 0) {
+          event.preventDefault();
+          void addFiles(images);
+          return;
+        }
+        const html = event.clipboardData ? event.clipboardData.getData('text/html') : '';
+        if (html === '') return;
+        const markdown = htmlToMarkdown(html);
+        if (markdown === null) return;
+        event.preventDefault();
+        const element = textareaRef.current;
+        const value = element ? element.value : editorRef.current.text;
+        const start = element && typeof element.selectionStart === 'number' ? element.selectionStart : value.length;
+        const end = element && typeof element.selectionEnd === 'number' ? element.selectionEnd : start;
+        applyMarkdownEdit({ text: value.slice(0, start) + markdown + value.slice(end), start: start + markdown.length, end: start + markdown.length });
+      }, [addFiles, applyMarkdownEdit]);
 
       /**
        * Auto-grow the textarea with its content (short notes keep the composer
@@ -2481,7 +2836,14 @@ window.__ModuleLoader__.load({
             title: t('editor.task'),
             'aria-label': t('editor.task'),
             onClick: () => toggleBlock('task'),
-          }, h(TaskIcon, null))) : null,
+          }, h(TaskIcon, null)),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__mdBtn',
+            title: t('editor.table'),
+            'aria-label': t('editor.table'),
+            onClick: insertTable,
+          }, h(TableIcon, null))) : null,
         h('button', {
           type: 'button',
           className: 'dsh-sp__iconBtn',
@@ -2508,6 +2870,13 @@ window.__ModuleLoader__.load({
       const statusBar = h('div', { className: 'dsh-sp__bar' },
         h('span', { className: 'dsh-sp__status', 'data-error': saveState === 'error' ? 'true' : 'false' },
           t('editor.chars') + ' ' + editor.text.length + (statusLabel ? ' · ' + statusLabel : '')),
+        editor.id ? h('button', {
+          type: 'button',
+          className: 'dsh-sp__textBtn',
+          title: t('history.open'),
+          'aria-label': t('history.open'),
+          onClick: () => { void openHistory(); },
+        }, t('history.title')) : null,
         h('span', { className: 'dsh-sp__barSpacer' }),
         h('button', {
           type: 'button',
@@ -2516,7 +2885,30 @@ window.__ModuleLoader__.load({
           onClick: () => { void startDraft(); },
         }, t('editor.jot'), h('span', { className: 'dsh-sp__jotKbd' }, isMacPlatform() ? '⌘↵' : 'Ctrl+↵')));
 
-      const editorBody = previewMode
+      const historyBody = h('div', { className: 'dsh-sp__history' },
+        h('div', { className: 'dsh-sp__bar' },
+          h('span', { className: 'dsh-sp__status' }, t('history.title')),
+          h('span', { className: 'dsh-sp__barSpacer' }),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__textBtn',
+            onClick: () => setHistoryOpen(false),
+          }, t('history.close'))),
+        historyItems === null
+          ? h('span', { className: 'dsh-sp__previewEmpty' }, t('panel.loading'))
+          : historyItems.length === 0
+            ? h('span', { className: 'dsh-sp__previewEmpty' }, t('history.empty'))
+            : historyItems.map((entry, index) => h('div', { key: entry.updatedAt + '-' + index, className: 'dsh-sp__historyItem' },
+              h('div', { className: 'dsh-sp__historyMeta' },
+                h('time', { dateTime: new Date(entry.updatedAt).toISOString() }, formatTime(entry.updatedAt)),
+                h('button', {
+                  type: 'button',
+                  className: 'dsh-sp__textBtn',
+                  onClick: () => restoreHistoryVersion(entry),
+                }, t('history.restore'))),
+              h('div', { className: 'dsh-sp__historyText' }, toPlainExcerpt(entry.text).trim() || t('note.untitled')))));
+
+      const editorBody = historyOpen && editor.id ? historyBody : previewMode
         ? h('div', {
           className: 'dsh-sp__preview',
           role: 'region',

@@ -10,8 +10,8 @@ const slice = (startMarker, endMarker) => {
 };
 
 const createElement = (type, props, ...children) => ({ type, props: props ?? {}, children });
-const build = new Function('h', `${slice('function highlightNodes', 'function toPlainExcerpt')}; return { renderInline, renderMarkdown, wrapMarkdown, toggleLinePrefix };`);
-const { renderInline, renderMarkdown, wrapMarkdown, toggleLinePrefix } = build(createElement);
+const build = new Function('h', `${slice('function highlightNodes', 'function toPlainExcerpt')}; return { renderInline, renderMarkdown, wrapMarkdown, toggleLinePrefix, htmlToMarkdown };`);
+const { renderInline, renderMarkdown, wrapMarkdown, toggleLinePrefix, htmlToMarkdown } = build(createElement);
 const excerpt = new Function(`${slice('function toPlainExcerpt', '// ---------------------------------------------------------------------\n    // Focus requests')}; return toPlainExcerpt;`)();
 
 function assert(condition, message) {
@@ -122,5 +122,28 @@ prefix = toggleLinePrefix('- done', 0, 6, 'task');
 assert(prefix.text === '- [ ] done', 'task converts a bullet line');
 prefix = toggleLinePrefix('- [x] done', 0, 10, 'task');
 assert(prefix.text === 'done', 'a task click on a checked box clears the marker');
+
+const tableBlocks = renderMarkdown('| a | b |\n| --- | ---: |\n| 1 | 2 |', () => {}, 'Task');
+const tableWrap = tableBlocks.find((block) => block.type === 'div');
+assert(tableWrap !== undefined, 'a GFM table renders inside a scroll wrapper');
+const tableMarks = flatten([tableWrap]);
+assert(tableMarks.includes('table') && tableMarks.includes('th') && tableMarks.includes('td'),
+  'table header and body cells render');
+const aligned = tableWrap.children.find((node) => node.type === 'table').children[0].children[0].children.flat()[1];
+assert(aligned.props.style && aligned.props.style.textAlign === 'right', 'separator colons map to cell alignment');
+assert(renderMarkdown('| just one line', () => {}, 'Task').every((block) => block.type !== 'div'),
+  'a lone pipe line is not a table');
+
+const converted = htmlToMarkdown('<h2>Title</h2><p>hello <b>world</b> &amp; friends</p><ul><li>one</li><li>two</li></ul>');
+assert(converted !== null && converted.includes('## Title'), 'headings convert');
+assert(converted.includes('**world**') && converted.includes('& friends'), 'bold and entities convert');
+assert(converted.includes('- one') && converted.includes('- two'), 'list items convert');
+const linked = htmlToMarkdown('<p>see <a href="https://example.com/x">the docs</a></p>');
+assert(linked.includes('[the docs](https://example.com/x)'), 'links convert to markdown');
+const tableHtml = htmlToMarkdown('<table><tr><th>a</th><th>b</th></tr><tr><td>1</td><td>2</td></tr></table>');
+assert(tableHtml.includes('| a | b |') && tableHtml.includes('| --- | --- |') && tableHtml.includes('| 1 | 2 |'),
+  'tables convert to GFM');
+assert(htmlToMarkdown('<p>just text, no formatting</p>') === null,
+  'unformatted HTML declines so the default paste keeps working');
 
 console.log('markdown test passed');
