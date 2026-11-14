@@ -127,6 +127,7 @@ window.__ModuleLoader__.load({
         'tags.all': 'All',
         'tags.filter': 'Filter by tag',
         'lightbox.close': 'Close preview',
+        'lightbox.download': 'Download',
       },
       zh: {
         'panel.title': '便签',
@@ -226,6 +227,7 @@ window.__ModuleLoader__.load({
         'tags.all': '全部',
         'tags.filter': '按标签筛选',
         'lightbox.close': '关闭预览',
+        'lightbox.download': '下载',
       },
     };
 
@@ -357,7 +359,10 @@ window.__ModuleLoader__.load({
 .dsh-sp__noteText mark.dsh-sp__hit,.dsh-sp__noteTag mark.dsh-sp__hit{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label);border-radius:3px;padding:0 1px}
 .dsh-sp__noteText[data-empty="true"]{color:var(--dsw-alias-label-secondary);font-style:italic}
 .dsh-sp__noteAttach{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px}
-.dsh-sp__thumb{width:30px;height:30px;border-radius:6px;overflow:hidden;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;letter-spacing:.03em;color:var(--dsw-alias-label-secondary);flex:none;text-decoration:none}
+.dsh-sp__thumb{width:30px;height:30px;border-radius:6px;overflow:hidden;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;letter-spacing:.03em;color:var(--dsw-alias-label-secondary);flex:none;text-decoration:none;cursor:pointer;padding:0;font-family:inherit}
+.dsh-sp__lightboxFrame{width:min(880px,88vw);height:86vh;border:none;border-radius:8px;background:var(--dsw-alias-bg-layer-1)}
+.dsh-sp__lightboxBar{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:70vw;padding:4px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}
+.dsh-sp__lightboxName{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dsh-sp__thumbImg{width:100%;height:100%;object-fit:cover;display:block}
 .dsh-sp__empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:32px 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.6;text-align:center}
 .dsh-sp__emptyIcon{color:var(--dsw-alias-border-l2)}
@@ -1635,12 +1640,11 @@ window.__ModuleLoader__.load({
           onClick: () => onOpen(attachment),
         }, h('img', { className: 'dsh-sp__tileImg', src: attachmentUrl(attachment.id, false, 'thumb'), alt: '', loading: 'lazy', decoding: 'async' }))
         : attachment.type === 'application/pdf'
-          ? h('a', {
+          ? h('button', {
+            type: 'button',
             className: 'dsh-sp__tileOpen',
-            href: attachmentUrl(attachment.id),
-            target: '_blank',
-            rel: 'noopener noreferrer',
             title: label,
+            onClick: () => onOpen(attachment),
           }, h('span', { className: 'dsh-sp__tileExt' }, extensionOf(attachment.name)))
           : h('a', {
             className: 'dsh-sp__tileOpen',
@@ -1659,22 +1663,28 @@ window.__ModuleLoader__.load({
         }, '×'));
     }
 
-    function NoteThumb({ attachment }) {
+    function NoteThumb({ attachment, onOpen }) {
+      const title = attachment.kind === 'image' ? attachment.name : `${attachment.name} (${formatSize(attachment.size)})`;
+      const previewable = typeof onOpen === 'function' && (attachment.kind === 'image' || attachment.type === 'application/pdf');
+      if (previewable) {
+        return h('button', {
+          type: 'button',
+          className: 'dsh-sp__thumb',
+          title,
+          onClick: (event) => {
+            event.stopPropagation();
+            onOpen(attachment);
+          },
+        },
+        attachment.kind === 'image'
+          ? h('img', { className: 'dsh-sp__thumbImg', src: attachmentUrl(attachment.id, false, 'thumb'), alt: '', loading: 'lazy', decoding: 'async' })
+          : extensionOf(attachment.name));
+      }
       if (attachment.kind === 'image') {
-        return h('span', { className: 'dsh-sp__thumb', title: attachment.name },
+        return h('span', { className: 'dsh-sp__thumb', title },
           h('img', { className: 'dsh-sp__thumbImg', src: attachmentUrl(attachment.id, false, 'thumb'), alt: '', loading: 'lazy', decoding: 'async' }));
       }
-      if (attachment.type === 'application/pdf') {
-        return h('a', {
-          className: 'dsh-sp__thumb',
-          title: `${attachment.name} (${formatSize(attachment.size)})`,
-          href: attachmentUrl(attachment.id),
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          onClick: (event) => event.stopPropagation(),
-        }, extensionOf(attachment.name));
-      }
-      return h('span', { className: 'dsh-sp__thumb', title: `${attachment.name} (${formatSize(attachment.size)})` }, extensionOf(attachment.name));
+      return h('span', { className: 'dsh-sp__thumb', title }, extensionOf(attachment.name));
     }
 
     function Lightbox({ attachment, onClose, t }) {
@@ -1685,6 +1695,7 @@ window.__ModuleLoader__.load({
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
       }, [onClose]);
+      const isPdf = attachment.type === 'application/pdf';
       return h('div', {
         className: 'dsh-sp__lightbox',
         role: 'dialog',
@@ -1692,12 +1703,26 @@ window.__ModuleLoader__.load({
         'aria-label': attachment.name,
         onClick: onClose,
       },
-      h('img', {
-        className: 'dsh-sp__lightboxImg',
-        src: attachmentUrl(attachment.id),
-        alt: attachment.name,
-        onClick: (event) => event.stopPropagation(),
-      }),
+      isPdf
+        ? h('iframe', {
+          className: 'dsh-sp__lightboxFrame',
+          src: attachmentUrl(attachment.id),
+          title: attachment.name,
+          onClick: (event) => event.stopPropagation(),
+        })
+        : h('img', {
+          className: 'dsh-sp__lightboxImg',
+          src: attachmentUrl(attachment.id),
+          alt: attachment.name,
+          onClick: (event) => event.stopPropagation(),
+        }),
+      h('div', { className: 'dsh-sp__lightboxBar', onClick: (event) => event.stopPropagation() },
+        h('span', { className: 'dsh-sp__lightboxName' }, attachment.name),
+        isPdf ? h('a', {
+          className: 'dsh-sp__textBtn',
+          href: attachmentUrl(attachment.id, true),
+          download: attachment.name,
+        }, t('lightbox.download')) : null),
       h('button', {
         type: 'button',
         className: 'dsh-sp__lightboxClose',
@@ -1772,7 +1797,7 @@ window.__ModuleLoader__.load({
     // Note card
     // ---------------------------------------------------------------------
 
-    function NoteCard({ note, active, confirming, query, t, onOpen, onTogglePin, onRequestDelete, onSend }) {
+    function NoteCard({ note, active, confirming, query, t, onOpen, onOpenAttachment, onTogglePin, onRequestDelete, onSend }) {
       const needle = typeof query === 'string' ? query.trim() : '';
       const preview = toPlainExcerpt(note.text).trim();
       return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false' },
@@ -1823,7 +1848,7 @@ window.__ModuleLoader__.load({
           'data-empty': preview ? 'false' : 'true',
         }, preview ? renderInline(preview, needle) : t('note.untitled')),
         note.attachments.length > 0 ? h('span', { className: 'dsh-sp__noteAttach' },
-          note.attachments.map((attachment) => h(NoteThumb, { key: attachment.id, attachment }))) : null,
+          note.attachments.map((attachment) => h(NoteThumb, { key: attachment.id, attachment, onOpen: onOpenAttachment }))) : null,
         note.tags.length > 0 ? h('span', { className: 'dsh-sp__noteTags' },
           note.tags.map((tag) => h('span', { key: tag, className: 'dsh-sp__noteTag' }, highlightNodes(`#${tag}`, needle, `tag-${tag}`)))) : null));
     }
@@ -3196,6 +3221,7 @@ window.__ModuleLoader__.load({
                 query,
                 t,
                 onOpen: (target) => { void openNote(target); },
+                onOpenAttachment: setPreview,
                 onTogglePin: togglePin,
                 onRequestDelete: requestDelete,
                 onSend: sendToChat,
