@@ -12,7 +12,8 @@ const slice = (startMarker, endMarker) => {
 const createElement = (type, props, ...children) => ({ type, props: props ?? {}, children });
 const build = new Function('h', `${slice('function highlightNodes', 'function toPlainExcerpt')}; return { renderInline, renderMarkdown, wrapMarkdown, toggleLinePrefix, htmlToMarkdown };`);
 const { renderInline, renderMarkdown, wrapMarkdown, toggleLinePrefix, htmlToMarkdown } = build(createElement);
-const excerpt = new Function(`${slice('function toPlainExcerpt', '// ---------------------------------------------------------------------\n    // Focus requests')}; return toPlainExcerpt;`)();
+const keyboard = new Function(`${slice('function toPlainExcerpt', '// ---------------------------------------------------------------------\n    // Focus requests')}; return { toPlainExcerpt, cursorStep, isEditableTarget };`)();
+const { toPlainExcerpt: excerpt, cursorStep, isEditableTarget } = keyboard;
 
 function assert(condition, message) {
   if (!condition) throw new Error(`assertion failed: ${message}`);
@@ -145,5 +146,12 @@ assert(tableHtml.includes('| a | b |') && tableHtml.includes('| --- | --- |') &&
   'tables convert to GFM');
 assert(htmlToMarkdown('<p>just text, no formatting</p>') === null,
   'unformatted HTML declines so the default paste keeps working');
+
+assert(cursorStep('ArrowDown') === 1 && cursorStep('ArrowUp') === -1 && cursorStep('Enter') === 0,
+  'cursor step maps only the arrow keys');
+assert(isEditableTarget({ tagName: 'TEXTAREA' }) && isEditableTarget({ tagName: 'INPUT' })
+  && isEditableTarget({ tagName: 'DIV', isContentEditable: true }) && !isEditableTarget({ tagName: 'DIV' })
+  && !isEditableTarget(null),
+  'editable targets are detected so their keys are never hijacked');
 
 console.log('markdown test passed');

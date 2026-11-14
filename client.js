@@ -27,6 +27,9 @@ window.__ModuleLoader__.load({
     const UNDO_DELAY_MS = 8000;
     const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
     const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+    /** Feed render cap: show a slice up front, grow on demand or by cursor. */
+    const INITIAL_RENDER = 80;
+    const RENDER_STEP = 80;
 
     const DICTS = {
       en: {
@@ -39,6 +42,7 @@ window.__ModuleLoader__.load({
         'panel.loading': 'Loading notes…',
         'panel.empty': 'No notes yet. Write your first idea above.',
         'panel.noResults': 'No note matches your search.',
+        'panel.showMore': 'Show more',
         'panel.loadError': 'Could not read the note store. Check that the plugin host side is running.',
         'panel.draftRestored': 'Restored an unsaved draft.',
         'panel.deleted': 'Note deleted — kept for 7 days.',
@@ -139,6 +143,7 @@ window.__ModuleLoader__.load({
         'panel.loading': '正在加载便签…',
         'panel.empty': '还没有便签，在上面写下第一条想法吧。',
         'panel.noResults': '没有匹配的便签。',
+        'panel.showMore': '显示更多',
         'panel.loadError': '无法读取便签存储，请确认插件 Host 端已加载。',
         'panel.draftRestored': '已恢复上次未保存的草稿。',
         'panel.deleted': '便签已删除，7 天内可恢复。',
@@ -241,6 +246,8 @@ window.__ModuleLoader__.load({
     .dsh-sp__listScroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 0 20px}
     .dsh-sp__composerFold{display:flex;align-items:center;gap:8px;width:100%;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:12px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
     .dsh-sp__composerFold:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
+    .dsh-sp__showMore{flex:none;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:10px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
+    .dsh-sp__showMore:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
     @media (max-width:900px){.dsh-sp__cols{flex-direction:column}.dsh-sp__composerCol{flex:none;width:auto}}
     .dsh-sp__inner{display:flex;flex-direction:column;gap:14px;width:100%;max-width:1100px;min-height:0;height:100%;padding:20px 24px 0;box-sizing:border-box}
 .dsh-sp__header{flex:none;display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
@@ -339,6 +346,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__note:hover .dsh-sp__noteTools,.dsh-sp__note:focus-within .dsh-sp__noteTools{visibility:visible}
 @media (hover:none){.dsh-sp__noteTools{visibility:visible}}
 .dsh-sp__note[data-active="true"]{border-color:var(--dsw-alias-brand-primary)}
+.dsh-sp__note[data-cursor="true"]{outline:2px solid light-dark(#3574f0,#7da4ff);outline-offset:-2px}
 .dsh-sp__note.dsh-sp__note--pinned,.dsh-sp__note.dsh-sp__note--pinned[data-active="true"]{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
 .dsh-sp__noteTop{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;min-height:24px}
 .dsh-sp__noteTime{font-size:11.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
@@ -1128,6 +1136,20 @@ window.__ModuleLoader__.load({
       return first ? (first.length > 60 ? first.slice(0, 60) + '…' : first) : '';
     }
 
+    /** Only the arrow keys move the feed cursor. */
+    function cursorStep(key) {
+      if (key === 'ArrowDown') return 1;
+      if (key === 'ArrowUp') return -1;
+      return 0;
+    }
+
+    /** Whether the event target is a text-entry surface (never hijack its keys). */
+    function isEditableTarget(target) {
+      if (target === null || typeof target !== 'object') return false;
+      const tag = target.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable === true;
+    }
+
     // ---------------------------------------------------------------------
     // Unsaved-draft recovery
     // ---------------------------------------------------------------------
@@ -1797,10 +1819,10 @@ window.__ModuleLoader__.load({
     // Note card
     // ---------------------------------------------------------------------
 
-    function NoteCard({ note, active, confirming, query, t, onOpen, onOpenAttachment, onTogglePin, onRequestDelete, onSend }) {
+    function NoteCard({ note, active, cursor, confirming, query, t, onOpen, onOpenAttachment, onTogglePin, onRequestDelete, onSend }) {
       const needle = typeof query === 'string' ? query.trim() : '';
       const preview = toPlainExcerpt(note.text).trim();
-      return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false' },
+      return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false', 'data-cursor': cursor ? 'true' : 'false' },
         h('div', { className: 'dsh-sp__noteTop' },
           h('time', { className: 'dsh-sp__noteTime', dateTime: new Date(note.updatedAt).toISOString() }, formatTime(note.updatedAt)),
           note.source === 'agent' ? h('span', { className: 'dsh-sp__agentFlag' }, 'Agent') : null,
@@ -1924,6 +1946,10 @@ window.__ModuleLoader__.load({
       const [historyOpen, setHistoryOpen] = useState(false);
       /** Versions from the Host; null while loading. */
       const [historyItems, setHistoryItems] = useState(null);
+      /** Keyboard cursor into the notes feed; -1 = none. */
+      const [cursorIndex, setCursorIndex] = useState(-1);
+      /** Feed render cap: grows on 显示更多 or when the cursor walks past it. */
+      const [renderLimit, setRenderLimit] = useState(INITIAL_RENDER);
 
       const editorRef = useRef(editor);
       /** updatedAt of the version this editor last synced with the Host; 0 = no base. */
@@ -2383,6 +2409,7 @@ window.__ModuleLoader__.load({
         textareaRef.current?.focus();
       }, [flush, updateEditor]);
 
+
       /** Overwrite the stored version with what is in the editor right now. */
       const resolveOverwrite = useCallback(() => {
         const current = editorRef.current;
@@ -2783,6 +2810,61 @@ window.__ModuleLoader__.load({
             || note.tags.some((tag) => tag.toLowerCase().includes(needle))
             || note.attachments.some((attachment) => attachment.name.toLowerCase().includes(needle)));
       }, [notes, query, selectedTag]);
+
+      // The cursor indexes into the live-notes feed; reset it whenever that
+      // list changes shape (search, tag filter, view switch).
+      useEffect(() => {
+        setCursorIndex(-1);
+        setRenderLimit(INITIAL_RENDER);
+      }, [query, selectedTag, listView]);
+
+      // Keep the keyboard cursor visible while it walks the feed.
+      useEffect(() => {
+        if (cursorIndex < 0) return;
+        const timer = window.setTimeout(() => {
+          const element = document.querySelector('.dsh-sp__listScroll [data-cursor="true"]');
+          if (element) element.scrollIntoView({ block: 'nearest' });
+        }, 0);
+        return () => window.clearTimeout(timer);
+      }, [cursorIndex, ready]);
+
+      // ↑/↓ walk the feed, ↵ opens, Esc dismisses. Typing surfaces keep their
+      // keys; the search box hands off with ↓/↑ without leaving the box.
+      useEffect(() => {
+        if (listView !== 'notes') return undefined;
+        const onKeyDown = (event) => {
+          if (event.metaKey || event.ctrlKey || event.altKey) return;
+          if (preview || historyOpen) return;
+          const inSearch = event.target === searchInputRef.current;
+          if (isEditableTarget(event.target) && !inSearch) return;
+          const step = cursorStep(event.key);
+          if (step !== 0) {
+            if (visibleNotes.length === 0) return;
+            event.preventDefault();
+            const next = cursorIndex < 0
+              ? (step > 0 ? 0 : visibleNotes.length - 1)
+              : Math.min(visibleNotes.length - 1, Math.max(0, cursorIndex + step));
+            setCursorIndex(next);
+            if (next >= renderLimit) setRenderLimit(next + 24);
+            return;
+          }
+          if (event.key === 'Enter' && cursorIndex >= 0 && !isEditableTarget(event.target)) {
+            const tag = event.target ? event.target.tagName : '';
+            if (tag === 'BUTTON' || tag === 'A') return;
+            const note = visibleNotes[cursorIndex];
+            if (note) {
+              event.preventDefault();
+              void openNote(note);
+            }
+            return;
+          }
+          if (event.key === 'Escape' && cursorIndex >= 0 && !isEditableTarget(event.target)) {
+            setCursorIndex(-1);
+          }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+      }, [listView, cursorIndex, renderLimit, visibleNotes, openNote, preview, historyOpen]);
 
       /** Open `- [ ]` count across live notes; the badge on the to-dos tab. */
       const openTaskCount = useMemo(() => notes.reduce(
@@ -3195,8 +3277,9 @@ window.__ModuleLoader__.load({
             const opts = d.getFullYear() === new Date().getFullYear() ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'short', day: 'numeric' };
             return d.toLocaleDateString(undefined, opts);
           };
-          const pinnedNotes = visibleNotes.filter((note) => note.pinned);
-          const dayNotes = visibleNotes.filter((note) => !note.pinned);
+          const shownNotes = visibleNotes.slice(0, renderLimit);
+          const pinnedNotes = shownNotes.filter((note) => note.pinned);
+          const dayNotes = shownNotes.filter((note) => !note.pinned);
           const sections = [];
           if (pinnedNotes.length > 0) sections.push({ label: t('group.pinned'), cards: pinnedNotes });
           let currentLabel = null;
@@ -3217,6 +3300,7 @@ window.__ModuleLoader__.load({
                 key: note.id,
                 note,
                 active: editor.id === note.id,
+                cursor: cursorIndex >= 0 && visibleNotes[cursorIndex] === note,
                 confirming: confirmId === note.id,
                 query,
                 t,
@@ -3226,6 +3310,13 @@ window.__ModuleLoader__.load({
                 onRequestDelete: requestDelete,
                 onSend: sendToChat,
               }))));
+          }
+          if (visibleNotes.length > shownNotes.length) {
+            listArea.push(h('button', {
+              type: 'button',
+              className: 'dsh-sp__showMore',
+              onClick: () => setRenderLimit((current) => current + RENDER_STEP),
+            }, t('panel.showMore') + ' (' + (visibleNotes.length - shownNotes.length) + ')'));
           }
         }
         feedChildren.push(h('div', { className: 'dsh-sp__listScroll' }, listArea));
