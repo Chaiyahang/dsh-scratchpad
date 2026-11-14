@@ -114,5 +114,13 @@ prefix = toggleLinePrefix('', 0, 0, 'ul');
 assert(prefix.text === '- ' && prefix.start === 0 && prefix.end === 2, 'an empty editor gets the marker inserted');
 prefix = toggleLinePrefix('task line', 0, 9, 'heading');
 assert(prefix.text === '## task line', 'heading applies the H2 marker');
+prefix = toggleLinePrefix('one\ntwo', 0, 7, 'task');
+assert(prefix.text === '- [ ] one\n- [ ] two', 'task applies the checkbox marker to every line');
+prefix = toggleLinePrefix(prefix.text, 0, prefix.text.length, 'task');
+assert(prefix.text === 'one\ntwo', 'a second task click removes the checkboxes');
+prefix = toggleLinePrefix('- done', 0, 6, 'task');
+assert(prefix.text === '- [ ] done', 'task converts a bullet line');
+prefix = toggleLinePrefix('- [x] done', 0, 10, 'task');
+assert(prefix.text === 'done', 'a task click on a checked box clears the marker');
 
 console.log('markdown test passed');

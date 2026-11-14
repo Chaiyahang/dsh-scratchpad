@@ -800,6 +800,7 @@ window.__ModuleLoader__.load({
       const kindMarker = {
         heading: /^\s*#{1,3}\s+/,
         ul: /^\s*[-*]\s+(?:\[[ xX]\]\s?)?/,
+        task: /^\s*[-*]\s+\[[ xX]\]\s?/,
         ol: /^\s*\d+\.\s+/,
       }[kind];
       const allMarked = lines.some((line) => kindMarker.test(line))
@@ -810,6 +811,7 @@ window.__ModuleLoader__.load({
         if (line.trim() === '' && lines.length > 1) return line;
         const bare = line.replace(blockMarker, '');
         if (kind === 'ol') return `${++counter}. ${bare}`;
+        if (kind === 'task') return '- [ ] ' + bare;
         return (kind === 'heading' ? '## ' : '- ') + bare;
       });
       const body = next.join('\n');
@@ -1311,6 +1313,12 @@ window.__ModuleLoader__.load({
         h('text', { x: 4.5, y: 8.8, fontSize: 8, fontWeight: 600, textAnchor: 'middle', fill: 'currentColor', stroke: 'none', fontFamily: 'inherit' }, '1'),
         h('text', { x: 4.5, y: 14.8, fontSize: 8, fontWeight: 600, textAnchor: 'middle', fill: 'currentColor', stroke: 'none', fontFamily: 'inherit' }, '2'),
         h('text', { x: 4.5, y: 20.8, fontSize: 8, fontWeight: 600, textAnchor: 'middle', fill: 'currentColor', stroke: 'none', fontFamily: 'inherit' }, '3'));
+    }
+
+    function TaskIcon() {
+      return h(LineIcon, { size: 15 },
+        h('rect', { x: 3.5, y: 3.5, width: 17, height: 17, rx: 3 }),
+        h('path', { d: 'm8 12.2 2.6 2.6L16.4 9' }));
     }
 
     function EmptyIcon() {
@@ -2466,7 +2474,14 @@ window.__ModuleLoader__.load({
             title: t('editor.ol'),
             'aria-label': t('editor.ol'),
             onClick: () => toggleBlock('ol'),
-          }, h(ListOrderedIcon, null))) : null,
+          }, h(ListOrderedIcon, null)),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__mdBtn',
+            title: t('editor.task'),
+            'aria-label': t('editor.task'),
+            onClick: () => toggleBlock('task'),
+          }, h(TaskIcon, null))) : null,
         h('button', {
           type: 'button',
           className: 'dsh-sp__iconBtn',
