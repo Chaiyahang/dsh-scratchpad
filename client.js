@@ -357,7 +357,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__noteText mark.dsh-sp__hit,.dsh-sp__noteTag mark.dsh-sp__hit{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label);border-radius:3px;padding:0 1px}
 .dsh-sp__noteText[data-empty="true"]{color:var(--dsw-alias-label-secondary);font-style:italic}
 .dsh-sp__noteAttach{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px}
-.dsh-sp__thumb{width:30px;height:30px;border-radius:6px;overflow:hidden;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;letter-spacing:.03em;color:var(--dsw-alias-label-secondary);flex:none}
+.dsh-sp__thumb{width:30px;height:30px;border-radius:6px;overflow:hidden;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;letter-spacing:.03em;color:var(--dsw-alias-label-secondary);flex:none;text-decoration:none}
 .dsh-sp__thumbImg{width:100%;height:100%;object-fit:cover;display:block}
 .dsh-sp__empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:32px 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.6;text-align:center}
 .dsh-sp__emptyIcon{color:var(--dsw-alias-border-l2)}
@@ -1635,11 +1635,12 @@ window.__ModuleLoader__.load({
           onClick: () => onOpen(attachment),
         }, h('img', { className: 'dsh-sp__tileImg', src: attachmentUrl(attachment.id, false, 'thumb'), alt: '', loading: 'lazy', decoding: 'async' }))
         : attachment.type === 'application/pdf'
-          ? h('button', {
-            type: 'button',
+          ? h('a', {
             className: 'dsh-sp__tileOpen',
+            href: attachmentUrl(attachment.id),
+            target: '_blank',
+            rel: 'noopener noreferrer',
             title: label,
-            onClick: () => { try { window.open(attachmentUrl(attachment.id), '_blank', 'noopener,noreferrer'); } catch {} },
           }, h('span', { className: 'dsh-sp__tileExt' }, extensionOf(attachment.name)))
           : h('a', {
             className: 'dsh-sp__tileOpen',
@@ -1662,6 +1663,16 @@ window.__ModuleLoader__.load({
       if (attachment.kind === 'image') {
         return h('span', { className: 'dsh-sp__thumb', title: attachment.name },
           h('img', { className: 'dsh-sp__thumbImg', src: attachmentUrl(attachment.id, false, 'thumb'), alt: '', loading: 'lazy', decoding: 'async' }));
+      }
+      if (attachment.type === 'application/pdf') {
+        return h('a', {
+          className: 'dsh-sp__thumb',
+          title: `${attachment.name} (${formatSize(attachment.size)})`,
+          href: attachmentUrl(attachment.id),
+          target: '_blank',
+          rel: 'noopener noreferrer',
+          onClick: (event) => event.stopPropagation(),
+        }, extensionOf(attachment.name));
       }
       return h('span', { className: 'dsh-sp__thumb', title: `${attachment.name} (${formatSize(attachment.size)})` }, extensionOf(attachment.name));
     }

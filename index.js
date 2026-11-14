@@ -590,17 +590,19 @@ export function apply(ctx) {
     const servingThumb = requestedThumb && servedName === attachment.thumbName;
     const servedType = servingThumb ? 'image/webp' : attachment.type;
     const inline = (INLINE_IMAGE_TYPES.test(servedType) || servedType === 'application/pdf') && url.searchParams.get('download') !== '1';
-    return new Response(bytes, {
-      status: 200,
-      headers: {
-        'content-type': inline ? servedType : 'application/octet-stream',
-        'content-length': String(bytes.byteLength),
-        'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(attachment.name)}`,
-        'cache-control': 'private, max-age=31536000, immutable',
-        'content-security-policy': 'sandbox',
-        'x-content-type-options': 'nosniff',
-      },
-    });
+    // PDFs opt out of the sandbox CSP: the browser's PDF viewer is a plugin
+    // context a sandboxed document cannot spawn, so a sandboxed PDF renders
+    // as a blank frame. The type above is exact-matched and nosniff is set;
+    // viewer script stays isolated from the app origin.
+    const headers = {
+      'content-type': inline ? servedType : 'application/octet-stream',
+      'content-length': String(bytes.byteLength),
+      'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(attachment.name)}`,
+      'cache-control': 'private, max-age=31536000, immutable',
+      'x-content-type-options': 'nosniff',
+    };
+    if (!(inline && servedType === 'application/pdf')) headers['content-security-policy'] = 'sandbox';
+    return new Response(bytes, { status: 200, headers });
   }
 
   // -------------------------------------------------------------------
