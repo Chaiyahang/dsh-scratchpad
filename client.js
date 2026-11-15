@@ -43,6 +43,9 @@ window.__ModuleLoader__.load({
         'panel.empty': 'No notes yet. Write your first idea above.',
         'panel.noResults': 'No note matches your search.',
         'panel.showMore': 'Show more',
+        'panel.clearSearch': 'Clear search',
+        'panel.restored': 'Note restored.',
+        'panel.dismissToast': 'Dismiss',
         'panel.loadError': 'Could not read the note store. Check that the plugin host side is running.',
         'panel.draftRestored': 'Restored an unsaved draft.',
         'panel.deleted': 'Note deleted — kept for 7 days.',
@@ -162,6 +165,9 @@ window.__ModuleLoader__.load({
         'panel.empty': '还没有便签，在上面写下第一条想法吧。',
         'panel.noResults': '没有匹配的便签。',
         'panel.showMore': '显示更多',
+        'panel.clearSearch': '清除搜索',
+        'panel.restored': '已恢复到便签列表。',
+        'panel.dismissToast': '点击关闭',
         'panel.loadError': '无法读取便签存储，请确认插件 Host 端已加载。',
         'panel.draftRestored': '已恢复上次未保存的草稿。',
         'panel.deleted': '便签已删除，7 天内可恢复。',
@@ -279,7 +285,7 @@ window.__ModuleLoader__.load({
     .dsh-sp__composerCol{flex:0 0 380px;display:flex;flex-direction:column;gap:10px;min-width:0;padding-bottom:20px}
     .dsh-sp__composerCol .dsh-sp__editor{flex:0 1 auto;min-height:0}
     .dsh-sp__feedCol{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;min-height:0}
-    .dsh-sp__listScroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 0 20px}
+    .dsh-sp__listScroll{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:2px 12px 20px 0}
     .dsh-sp__composerFold{display:flex;align-items:center;gap:8px;width:100%;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:12px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
     .dsh-sp__composerFold:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
     .dsh-sp__showMore{flex:none;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:10px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
@@ -364,6 +370,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__textBtn:disabled{opacity:.5;cursor:default}
 .dsh-sp__textBtn:disabled:hover{background:transparent;color:var(--dsw-alias-label-secondary)}
 .dsh-sp__textBtn[data-danger="true"]{color:var(--dsw-alias-state-error-primary)}
+.dsh-sp__textBtn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
 .dsh-sp__status{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
 .dsh-sp__status[data-error="true"]{color:var(--dsw-alias-state-error-primary)}
 .dsh-sp__notice{flex:none;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -378,17 +385,17 @@ window.__ModuleLoader__.load({
 .dsh-sp__note{border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);border-radius:12px;padding:9px 12px 10px;transition:border-color .12s ease}
 .dsh-sp__note:hover{border-color:light-dark(#3574f0,#7da4ff)}
 .dsh-sp__pinnedFlag{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:light-dark(#3574f0,#7da4ff)}
-.dsh-sp__noteTools{display:flex;align-items:center;gap:2px;margin-left:auto;visibility:hidden}
-.dsh-sp__note:hover .dsh-sp__noteTools,.dsh-sp__note:focus-within .dsh-sp__noteTools{visibility:visible}
-@media (hover:none){.dsh-sp__noteTools{visibility:visible}}
+.dsh-sp__noteTools{display:flex;align-items:center;gap:2px;margin-left:auto;visibility:hidden;opacity:0;transition:opacity .12s ease}
+.dsh-sp__note:hover .dsh-sp__noteTools,.dsh-sp__note:focus-within .dsh-sp__noteTools{visibility:visible;opacity:1}
+@media (hover:none){.dsh-sp__noteTools{visibility:visible;opacity:1;transition:none}}
 .dsh-sp__note[data-active="true"]{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__note[data-cursor="true"]{outline:2px solid light-dark(#3574f0,#7da4ff);outline-offset:-2px}
 .dsh-sp__note.dsh-sp__note--pinned,.dsh-sp__note.dsh-sp__note--pinned[data-active="true"]{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
 .dsh-sp__noteTop{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;min-height:24px}
 .dsh-sp__noteTime{font-size:11.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
-.dsh-sp__noteTools{display:flex;align-items:center;gap:2px;margin-left:auto;visibility:hidden}
-.dsh-sp__note:hover .dsh-sp__noteTools,.dsh-sp__note:focus-within .dsh-sp__noteTools{visibility:visible}
-@media (hover:none){.dsh-sp__noteTools{visibility:visible}}
+.dsh-sp__noteTools{display:flex;align-items:center;gap:2px;margin-left:auto;visibility:hidden;opacity:0;transition:opacity .12s ease}
+.dsh-sp__note:hover .dsh-sp__noteTools,.dsh-sp__note:focus-within .dsh-sp__noteTools{visibility:visible;opacity:1}
+@media (hover:none){.dsh-sp__noteTools{visibility:visible;opacity:1;transition:none}}
 .dsh-sp__groupHead{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--dsw-alias-label-secondary);margin:8px 0 0}
 .dsh-sp__groupHead::after{content:'';flex:1;height:1px;background:var(--dsw-alias-border-l1)}
 .dsh-sp__noteBtn{display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:28px;border:none;background:transparent;color:var(--dsw-alias-label-secondary);border-radius:7px;cursor:pointer;padding:0 4px;font-size:12.5px;font-family:inherit;line-height:1}
@@ -414,9 +421,13 @@ window.__ModuleLoader__.load({
 .dsh-sp__modalRow{display:flex;gap:14px;font-size:12.5px;line-height:1.6;color:var(--dsw-alias-label-primary)}
 .dsh-sp__modalWarn{color:var(--dsw-alias-state-warn-primary);font-weight:600}
 .dsh-sp__modalNote{font-size:11.5px;line-height:1.6;color:var(--dsw-alias-state-warn-primary)}
-.dsh-sp__toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:70;max-width:80vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-base);border-radius:999px;padding:8px 18px;font-size:12.5px;line-height:1.5;font-family:inherit;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.dsh-sp__toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:70;max-width:80vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-base);border-radius:999px;padding:8px 18px;font-size:12.5px;line-height:1.5;font-family:inherit;box-shadow:0 6px 24px rgba(0,0,0,.25);cursor:pointer}
 .dsh-sp__chipBtn{border:1px solid var(--dsw-alias-border-l1);border-radius:999px;padding:1px 10px}
 .dsh-sp__chipBtn:hover{border-color:light-dark(#3574f0,#7da4ff)}
+.dsh-sp__listScroll,.dsh-sp__textarea,.dsh-sp__preview{scrollbar-width:thin;scrollbar-color:var(--dsw-alias-border-l2) transparent}
+.dsh-sp__listScroll::-webkit-scrollbar,.dsh-sp__textarea::-webkit-scrollbar,.dsh-sp__preview::-webkit-scrollbar{width:8px;height:8px}
+.dsh-sp__listScroll::-webkit-scrollbar-thumb,.dsh-sp__textarea::-webkit-scrollbar-thumb,.dsh-sp__preview::-webkit-scrollbar-thumb{background:var(--dsw-alias-border-l2);border-radius:4px}
+.dsh-sp__listScroll::-webkit-scrollbar-track,.dsh-sp__textarea::-webkit-scrollbar-track,.dsh-sp__preview::-webkit-scrollbar-track{background:transparent}
 .dsh-sp__note[data-selected="true"]{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
 .dsh-sp__bulkBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding:7px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}
 .dsh-sp__bulkInput{flex:1;min-width:120px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:7px;padding:3px 8px;font-size:12px;font-family:inherit;line-height:1.5;outline:none}
@@ -1593,8 +1604,8 @@ window.__ModuleLoader__.load({
         h('path', { d: 'M12 12v8.5' }));
     }
 
-    function TrashIcon() {
-      return h(LineIcon, { size: 13 },
+    function TrashIcon({ size = 13 }) {
+      return h(LineIcon, { size },
         h('path', { d: 'M4.5 6.5h15' }),
         h('path', { d: 'M9.5 6.5V4.8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v1.7' }),
         h('path', { d: 'M6.5 6.5l.9 12a2 2 0 0 0 2 1.9h5.2a2 2 0 0 0 2-1.9l.9-12' }),
@@ -1613,6 +1624,12 @@ window.__ModuleLoader__.load({
       },
       h('path', { fill: 'currentColor', d: 'M11 3.5c.65 3.7 2.9 5.85 6.6 6.5-3.7.65-5.95 2.8-6.6 6.5-.65-3.7-2.9-5.85-6.6-6.5 3.7-.65 5.95-2.8 6.6-6.5z' }),
       h('path', { fill: 'currentColor', d: 'M18.6 14.2c.3 1.7 1.3 2.7 3 3-1.7.3-2.7 1.3-3 3-.3-1.7-1.3-2.7-3-3 1.7-.3 2.7-1.3 3-3z' }));
+    }
+
+    function SearchIcon({ size = 34 }) {
+      return h(LineIcon, { size },
+        h('circle', { cx: 11, cy: 11, r: 6.5 }),
+        h('path', { d: 'm16 16 4.5 4.5' }));
     }
 
     function DownloadIcon() {
@@ -2670,6 +2687,7 @@ window.__ModuleLoader__.load({
             setNotes(sortNotes(snapshot.notes));
             setTrashed(sortByDeleted(snapshot.trashed || []));
             revisionRef.current = snapshot.revision;
+            setNotice(t('panel.restored'));
             setSaveState('saved');
           } catch (error) {
             setNotice(error instanceof Error ? error.message : String(error));
@@ -3632,8 +3650,14 @@ window.__ModuleLoader__.load({
         const listArea = [];
         if (listEmpty) {
           listArea.push(h('div', { className: 'dsh-sp__empty' },
-            h('span', { className: 'dsh-sp__emptyIcon' }, h(todoView ? TasksIcon : EmptyIcon, null)),
-            h('span', null, trashView ? t('trash.empty') : todoView ? t('todos.empty') : query.trim() ? t('panel.noResults') : t('panel.empty'))));
+            h('span', { className: 'dsh-sp__emptyIcon' },
+              h(trashView ? TrashIcon : todoView ? TasksIcon : query.trim() ? SearchIcon : EmptyIcon, trashView ? { size: 34 } : null)),
+            h('span', null, trashView ? t('trash.empty') : todoView ? t('todos.empty') : query.trim() ? t('panel.noResults') : t('panel.empty')),
+            !trashView && !todoView && query.trim() !== '' ? h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              onClick: () => setQuery(''),
+            }, t('panel.clearSearch')) : null));
         } else if (trashView) {
           listArea.push(h('div', { className: 'dsh-sp__list' },
             trashed.map((note) => h(TrashCard, {
@@ -3812,7 +3836,7 @@ window.__ModuleLoader__.load({
               disabled: importing,
               onClick: () => { void confirmImport(); },
             }, importing ? t('data.importing') : t('data.importConfirm')))) : null,
-          notice ? h('div', { className: 'dsh-sp__toast', role: 'status' }, notice) : null));
+          notice ? h('div', { className: 'dsh-sp__toast', role: 'status', title: t('panel.dismissToast'), onClick: () => setNotice('') }, notice) : null));
     }
 
     return {
