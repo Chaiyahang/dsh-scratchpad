@@ -119,6 +119,7 @@ window.__ModuleLoader__.load({
         'shortcut.newShort': 'New',
         'shortcut.searchShort': 'Search',
         'data.export': 'Export',
+        'data.exportAll': 'Export all',
         'data.exportSelected': 'Export selected',
         'data.exportedSelected': 'Exported',
         'data.importFileCount': 'Notes in file:',
@@ -134,6 +135,7 @@ window.__ModuleLoader__.load({
         'data.importReplace': 'replaced notes',
         'data.importConfirm': 'Import now',
         'data.importCancel': 'Cancel',
+        'data.exportFailed': 'Export failed',
         'panel.select': 'Select',
         'panel.cancelSelect': 'Cancel',
         'panel.selectedCount': 'Selected',
@@ -236,6 +238,7 @@ window.__ModuleLoader__.load({
         'shortcut.newShort': '新建',
         'shortcut.searchShort': '搜索',
         'data.export': '导出',
+        'data.exportAll': '导出全部',
         'data.exportSelected': '导出所选',
         'data.exportedSelected': '已导出',
         'data.importFileCount': '文件包含',
@@ -251,6 +254,7 @@ window.__ModuleLoader__.load({
         'data.importReplace': '替换',
         'data.importConfirm': '确认导入',
         'data.importCancel': '取消',
+        'data.exportFailed': '导出失败',
         'panel.select': '多选',
         'panel.cancelSelect': '取消',
         'panel.selectedCount': '已选',
@@ -404,12 +408,15 @@ window.__ModuleLoader__.load({
 .dsh-sp__lightboxBar{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:70vw;padding:4px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}
 .dsh-sp__lightboxName{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dsh-sp__lightboxCount{font-size:11.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
-.dsh-sp__modal{display:flex;flex-direction:column;gap:10px;width:min(420px,86vw);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.dsh-sp__modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;display:flex;flex-direction:column;gap:10px;width:min(420px,86vw);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
 .dsh-sp__modalTitle{font-size:14px;font-weight:600;line-height:1.5;color:var(--dsw-alias-label-primary)}
 .dsh-sp__modalFile{font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary);word-break:break-all}
 .dsh-sp__modalRow{display:flex;gap:14px;font-size:12.5px;line-height:1.6;color:var(--dsw-alias-label-primary)}
 .dsh-sp__modalWarn{color:var(--dsw-alias-state-warn-primary);font-weight:600}
 .dsh-sp__modalNote{font-size:11.5px;line-height:1.6;color:var(--dsw-alias-state-warn-primary)}
+.dsh-sp__toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:70;max-width:80vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-base);border-radius:999px;padding:8px 18px;font-size:12.5px;line-height:1.5;font-family:inherit;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.dsh-sp__chipBtn{border:1px solid var(--dsw-alias-border-l1);border-radius:999px;padding:1px 10px}
+.dsh-sp__chipBtn:hover{border-color:light-dark(#3574f0,#7da4ff)}
 .dsh-sp__note[data-selected="true"]{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
 .dsh-sp__bulkBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding:7px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}
 .dsh-sp__bulkInput{flex:1;min-width:120px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:7px;padding:3px 8px;font-size:12px;font-family:inherit;line-height:1.5;outline:none}
@@ -1595,6 +1602,13 @@ window.__ModuleLoader__.load({
         h('path', { d: 'M13.5 10.5v6' }));
     }
 
+    function DownloadIcon() {
+      return h(LineIcon, { size: 13 },
+        h('path', { d: 'M12 3.5v11' }),
+        h('path', { d: 'm7 10.5 5 5 5-5' }),
+        h('path', { d: 'M4.5 20.5h15' }));
+    }
+
     function SendIcon() {
       return h(LineIcon, { size: 13 },
         h('path', { d: 'M20.5 3.5 3.5 10.5l7 3 3 7z' }),
@@ -1908,7 +1922,7 @@ window.__ModuleLoader__.load({
     // Note card
     // ---------------------------------------------------------------------
 
-    function NoteCard({ note, active, cursor, confirming, query, t, selectMode, selected, onToggleSelect, onOpen, onOpenAttachment, onTogglePin, onRequestDelete, onSend }) {
+    function NoteCard({ note, active, cursor, confirming, query, t, selectMode, selected, onToggleSelect, onOpen, onOpenAttachment, onExport, onTogglePin, onRequestDelete, onSend }) {
       const needle = typeof query === 'string' ? query.trim() : '';
       const preview = toPlainExcerpt(note.text).trim();
       return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false', 'data-cursor': cursor ? 'true' : 'false', 'data-selected': selected ? 'true' : 'false' },
@@ -1924,6 +1938,13 @@ window.__ModuleLoader__.load({
           note.source === 'agent' ? h('span', { className: 'dsh-sp__agentFlag' }, 'Agent') : null,
           note.pinned ? h('span', { className: 'dsh-sp__pinnedFlag' }, h(PinIcon, null), t('note.pinnedFlag')) : null,
           h('div', { className: 'dsh-sp__noteTools' },
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__noteBtn',
+              'aria-label': t('data.export'),
+              title: t('data.export'),
+              onClick: () => onExport(note),
+            }, h(DownloadIcon, null)),
             h('button', {
               type: 'button',
               className: 'dsh-sp__noteBtn',
@@ -2857,6 +2878,37 @@ window.__ModuleLoader__.load({
         sendToConversation();
       }, [sendToConversation]);
 
+      /** Export the given notes; ids travel in a POST body, not the query. */
+      const runExport = useCallback((ids) => {
+        if (ids.length === 0) return;
+        void (async () => {
+          try {
+            const response = await fetch(API + '/export', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              cache: 'no-store',
+              body: JSON.stringify({ ids }),
+            });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = 'scratchpad-' + new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '') + '.json';
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+            setNotice(t('data.exportedSelected') + ' ' + ids.length);
+          } catch (error) {
+            setNotice(t('data.exportFailed') + ': ' + (error instanceof Error ? error.message : String(error)));
+          } finally {
+            setSelectMode(false);
+            setSelectedIds(new Set());
+          }
+        })();
+      }, [t]);
+
       /** Send a single attachment to the composer (attachment-only handoff). */
       const sendAttachmentToChat = useCallback((attachment) => {
         if (!attachment) return;
@@ -3382,7 +3434,6 @@ window.__ModuleLoader__.load({
           h('datalist', { id: 'dsh-scratchpad-tag-options' },
             allTags.map(([tag]) => h('option', { key: tag, value: tag })))),
         statusBar,
-        notice ? h('div', { className: 'dsh-sp__notice', role: 'status' }, notice) : null,
         conflict ? h('div', { className: 'dsh-sp__conflict', role: 'alert' },
           h('span', null, t('editor.conflict')),
           h('button', {
@@ -3445,38 +3496,32 @@ window.__ModuleLoader__.load({
             h('span', { className: 'dsh-sp__barSpacer' }),
             listView === 'notes' ? h('button', {
               type: 'button',
-              className: 'dsh-sp__textBtn',
+              className: 'dsh-sp__textBtn dsh-sp__chipBtn',
               onClick: toggleSelectMode,
             }, selectMode ? t('panel.cancelSelect') : t('panel.select')) : null,
             listView === 'notes' && !selectMode ? h('a', {
-              className: 'dsh-sp__textBtn',
+              className: 'dsh-sp__textBtn dsh-sp__chipBtn',
               href: API + '/export?attachments=1',
               title: t('data.exportHint'),
-            }, t('data.export')) : null,
-            listView === 'notes' && selectMode ? (selectedIds.size > 0
-              ? h('a', {
-                className: 'dsh-sp__textBtn',
-                href: API + '/export?attachments=1&' + [...selectedIds].map((id) => 'ids=' + encodeURIComponent(id)).join('&'),
-                title: t('data.exportHint'),
-                onClick: () => {
-                  setNotice(t('data.exportedSelected') + ' ' + selectedIds.size);
-                  window.setTimeout(() => {
-                    setSelectMode(false);
-                    setSelectedIds(new Set());
-                  }, 0);
-                },
-              }, t('data.exportSelected') + ' ' + selectedIds.size)
-              : h('span', { className: 'dsh-sp__textBtn', 'aria-disabled': 'true', style: { opacity: .45, cursor: 'default' } }, t('data.exportSelected'))) : null,
+              onClick: () => setNotice(t('data.exportedSelected') + ' ' + notes.length),
+            }, t('data.exportAll')) : null,
+            listView === 'notes' && selectMode ? h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn dsh-sp__chipBtn',
+              disabled: selectedIds.size === 0,
+              title: t('data.exportHint'),
+              onClick: () => runExport([...selectedIds]),
+            }, t('data.exportSelected') + (selectedIds.size > 0 ? ' ' + selectedIds.size : '')) : null,
             listView === 'notes' && !selectMode ? h('button', {
               type: 'button',
-              className: 'dsh-sp__textBtn',
+              className: 'dsh-sp__textBtn dsh-sp__chipBtn',
               title: t('data.importHint'),
               disabled: importing,
               onClick: () => importInputRef.current?.click(),
             }, importing ? t('data.importing') : t('data.import')) : null,
             trashView && trashed.length > 0 ? h('button', {
               type: 'button',
-              className: 'dsh-sp__textBtn',
+              className: 'dsh-sp__textBtn dsh-sp__chipBtn',
               'data-danger': confirmEmpty ? 'true' : 'false',
               title: confirmEmpty ? t('trash.confirmEmpty') : t('trash.emptyAll'),
               'aria-label': confirmEmpty ? t('trash.confirmEmpty') : t('trash.emptyAll'),
@@ -3484,17 +3529,17 @@ window.__ModuleLoader__.load({
             }, confirmEmpty ? t('trash.confirmEmpty') : t('trash.emptyAll')) : null,
             listView === 'notes' ? h('button', {
               type: 'button',
-              className: 'dsh-sp__textBtn',
+              className: 'dsh-sp__textBtn dsh-sp__chipBtn',
               onClick: () => setListView('todos'),
             }, t('todos.title') + ' ' + openTaskCount) : null,
             listView === 'notes' ? h('button', {
               type: 'button',
-              className: 'dsh-sp__textBtn',
+              className: 'dsh-sp__textBtn dsh-sp__chipBtn',
               onClick: () => setListView('trash'),
             }, t('trash.title') + ' ' + trashed.length) : null,
             listView !== 'notes' ? h('button', {
               type: 'button',
-              className: 'dsh-sp__textBtn',
+              className: 'dsh-sp__textBtn dsh-sp__chipBtn',
               onClick: () => setListView('notes'),
             }, t('trash.back')) : null));
         feedChildren.push(toolbar);
@@ -3661,6 +3706,7 @@ window.__ModuleLoader__.load({
                 onToggleSelect: toggleSelect,
                 onOpen: (target) => { void openNote(target); },
                 onOpenAttachment: openPreview,
+                onExport: (target) => runExport([target.id]),
                 onTogglePin: togglePin,
                 onRequestDelete: requestDelete,
                 onSend: sendToChat,
@@ -3726,35 +3772,34 @@ window.__ModuleLoader__.load({
             onSaveNote: saveAttachmentAsNote,
           }) : null,
           importPreview ? h('div', {
-            className: 'dsh-sp__lightbox',
+            className: 'dsh-sp__modal',
             role: 'dialog',
             'aria-modal': 'true',
             'aria-label': t('data.importConfirm'),
-            onClick: () => setImportPreview(null),
           },
-          h('div', { className: 'dsh-sp__modal', onClick: (event) => event.stopPropagation() },
-            h('div', { className: 'dsh-sp__modalTitle' }, t('data.importConfirm')),
-            h('div', { className: 'dsh-sp__modalFile' }, importPreview.name),
-            h('div', { className: 'dsh-sp__modalRow' },
-              h('span', null, t('data.importFileCount') + ' ' + (importPreview.newCount + importPreview.replaceCount))),
-            h('div', { className: 'dsh-sp__modalRow' },
-              h('span', null, t('data.importNew') + ' ' + importPreview.newCount),
-              importPreview.replaceCount > 0 ? h('span', { className: 'dsh-sp__modalWarn' }, t('data.importReplace') + ' ' + importPreview.replaceCount) : null),
-            importPreview.replaceCount > 0 ? h('div', { className: 'dsh-sp__modalNote' }, t('data.importReplaceHint')) : null,
-            h('div', { className: 'dsh-sp__bar' },
-              h('span', { className: 'dsh-sp__barSpacer' }),
-              h('button', {
-                type: 'button',
-                className: 'dsh-sp__textBtn',
-                disabled: importing,
-                onClick: () => setImportPreview(null),
-              }, t('data.importCancel')),
-              h('button', {
-                type: 'button',
-                className: 'dsh-sp__new',
-                disabled: importing,
-                onClick: () => { void confirmImport(); },
-              }, importing ? t('data.importing') : t('data.importConfirm'))))) : null));
+          h('div', { className: 'dsh-sp__modalTitle' }, t('data.importConfirm')),
+          h('div', { className: 'dsh-sp__modalFile' }, importPreview.name),
+          h('div', { className: 'dsh-sp__modalRow' },
+            h('span', null, t('data.importFileCount') + ' ' + (importPreview.newCount + importPreview.replaceCount))),
+          h('div', { className: 'dsh-sp__modalRow' },
+            h('span', null, t('data.importNew') + ' ' + importPreview.newCount),
+            importPreview.replaceCount > 0 ? h('span', { className: 'dsh-sp__modalWarn' }, t('data.importReplace') + ' ' + importPreview.replaceCount) : null),
+          importPreview.replaceCount > 0 ? h('div', { className: 'dsh-sp__modalNote' }, t('data.importReplaceHint')) : null,
+          h('div', { className: 'dsh-sp__bar' },
+            h('span', { className: 'dsh-sp__barSpacer' }),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              disabled: importing,
+              onClick: () => setImportPreview(null),
+            }, t('data.importCancel')),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__new',
+              disabled: importing,
+              onClick: () => { void confirmImport(); },
+            }, importing ? t('data.importing') : t('data.importConfirm')))) : null,
+          notice ? h('div', { className: 'dsh-sp__toast', role: 'status' }, notice) : null));
     }
 
     return {

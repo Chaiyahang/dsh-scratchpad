@@ -419,21 +419,22 @@ export function apply(ctx) {
     return json({ ok: true });
   }
 
-  async function handleExport(request) {
+  async function handleExport(request, idFilter = null) {
     const url = new URL(request.url);
     const withAttachments = url.searchParams.get('attachments') !== '0';
-    // Optional ids filter: the panel's bulk-selection exports just those notes.
-    // Accepts both ids=a,b and ids=a&ids=b — repeated params survive any
-    // percent-encoding mangling of commas along the fetch channel.
+    // Optional ids filter (query fallback): the panel's bulk-selection exports
+    // just those notes. GET queries have proven unreliable on the channel, so
+    // the client normally POSTs the ids instead (handleExportPost).
     const rawIds = url.searchParams.getAll('ids');
-    const idFilter = rawIds.length > 0
+    const queryFilter = rawIds.length > 0
       ? new Set(rawIds.flatMap((value) => String(value).split(',')).filter((id) => /^[A-Za-z0-9-]{1,80}$/.test(id)))
       : null;
+    const effectiveFilter = idFilter !== null ? idFilter : queryFilter;
     const state = await readState();
     const notes = [];
     for (const note of state.notes) {
       if (note.deletedAt) continue;
-      if (idFilter !== null && !idFilter.has(note.id)) continue;
+      if (effectiveFilter !== null && !effectiveFilter.has(note.id)) continue;
       const attachments = [];
       for (const attachment of note.attachments) {
         const entry = {
@@ -474,6 +475,16 @@ export function apply(ctx) {
         'cache-control': 'no-store',
       },
     });
+  }
+
+  /** Filtered export via POST body — the one channel that carries params reliably. */
+  async function handleExportPost(request) {
+    const body = await readBody(request);
+    const ids = Array.isArray(body?.ids)
+      ? body.ids.filter((id) => typeof id === 'string' && /^[A-Za-z0-9-]{1,80}$/.test(id))
+      : [];
+    if (ids.length === 0) throw badRequest('missing export ids');
+    return handleExport(request, new Set(ids));
   }
 
   /**
@@ -1070,7 +1081,7 @@ export function apply(ctx) {
         { path: `${API}/notes/history`, handlers: { GET: handleNoteHistory } },
         { path: `${API}/files`, handlers: { GET: handleFile, POST: handleUpload } },
         { path: `${API}/files/delete`, handlers: { POST: handleDeleteFile } },
-        { path: `${API}/export`, handlers: { GET: handleExport } },
+        { path: `${API}/export`, handlers: { GET: handleExport, POST: handleExportPost } },
         { path: `${API}/import`, handlers: { POST: handleImport } },
       ].map(({ path, handlers }) => ({
         path,

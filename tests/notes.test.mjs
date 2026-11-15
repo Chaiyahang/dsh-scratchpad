@@ -108,6 +108,14 @@ try {
   assert(picked2.body.notes.length === 2 && picked2.body.notes.some((item) => item.id === 'tags-case'),
     'export accepts repeated ids params');
 
+  // The panel's bulk export POSTs the ids — the channel carries bodies, not
+  // always query strings.
+  const posted = await harness.request('POST', '/api/scratchpad/export', { json: { ids: ['note-a'] } });
+  assert(posted.status === 200 && posted.body.notes.length === 1 && posted.body.notes[0].id === 'note-a',
+    'POST export filters by body ids');
+  const postedBad = await harness.request('POST', '/api/scratchpad/export', { json: { ids: [] } });
+  assert(postedBad.status === 400, 'a POST export without ids is refused');
+
   for (const id of ['note-a', 'tags-case', 'tags-cap', taggedId]) {
     await harness.request('POST', '/api/scratchpad/notes/delete', { json: { id } });
   }
