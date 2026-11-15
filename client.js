@@ -126,6 +126,16 @@ window.__ModuleLoader__.load({
         'data.imported': 'Import complete.',
         'data.importInvalid': 'That file is not a scratchpad backup.',
         'data.importFailed': 'Import failed',
+        'data.importNew': 'new notes',
+        'data.importReplace': 'replaced notes',
+        'data.importConfirm': 'Import now',
+        'data.importCancel': 'Cancel',
+        'panel.select': 'Select',
+        'panel.cancelSelect': 'Cancel',
+        'panel.selectedCount': 'Selected',
+        'panel.selectAll': 'Select all',
+        'panel.selectNone': 'Clear',
+        'panel.addTag': 'Add tag',
         'tags.add': 'Add tag…',
         'tags.remove': 'Remove tag',
         'tags.all': 'All',
@@ -229,6 +239,16 @@ window.__ModuleLoader__.load({
         'data.imported': '导入完成。',
         'data.importInvalid': '不是有效的便签备份文件。',
         'data.importFailed': '导入失败',
+        'data.importNew': '新增',
+        'data.importReplace': '替换',
+        'data.importConfirm': '确认导入',
+        'data.importCancel': '取消',
+        'panel.select': '多选',
+        'panel.cancelSelect': '取消',
+        'panel.selectedCount': '已选',
+        'panel.selectAll': '全选',
+        'panel.selectNone': '全不选',
+        'panel.addTag': '加标签',
         'tags.add': '添加标签…',
         'tags.remove': '移除标签',
         'tags.all': '全部',
@@ -375,6 +395,10 @@ window.__ModuleLoader__.load({
 .dsh-sp__lightboxFrame{width:min(880px,88vw);height:86vh;border:none;border-radius:8px;background:var(--dsw-alias-bg-layer-1)}
 .dsh-sp__lightboxBar{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:70vw;padding:4px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}
 .dsh-sp__lightboxName{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dsh-sp__lightboxCount{font-size:11.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
+.dsh-sp__note[data-selected="true"]{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
+.dsh-sp__bulkBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding:7px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}
+.dsh-sp__bulkInput{flex:1;min-width:120px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:7px;padding:3px 8px;font-size:12px;font-family:inherit;line-height:1.5;outline:none}
 .dsh-sp__thumbImg{width:100%;height:100%;object-fit:cover;display:block}
 .dsh-sp__empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:32px 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.6;text-align:center}
 .dsh-sp__emptyIcon{color:var(--dsw-alias-border-l2)}
@@ -416,8 +440,9 @@ window.__ModuleLoader__.load({
       return body;
     }
 
+    /** Combined snapshot: the live list and the trash ride one conditional poll. */
     async function fetchSnapshot(since) {
-      return apiJson(since > 0 ? API + '/notes?since=' + since : API + '/notes');
+      return apiJson(since > 0 ? API + '/notes?include=trash&since=' + since : API + '/notes?include=trash');
     }
 
     /**
@@ -439,10 +464,6 @@ window.__ModuleLoader__.load({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(permanent === true ? { id, permanent: true } : { id }),
       });
-    }
-
-    async function fetchTrashList(since) {
-      return apiJson(since > 0 ? API + '/notes?view=trash&since=' + since : API + '/notes?view=trash');
     }
 
     async function emptyTrashRemote() {
@@ -1713,14 +1734,38 @@ window.__ModuleLoader__.load({
       return h('span', { className: 'dsh-sp__thumb', title }, extensionOf(attachment.name));
     }
 
-    function Lightbox({ attachment, onClose, t, onSend, onSaveNote }) {
+    function Lightbox({ attachment, attachments, onNavigate, onClose, t, onSend, onSaveNote }) {
+      const list = Array.isArray(attachments) ? attachments : [];
+      const index = list.findIndex((item) => item.id === attachment.id);
+      const step = (delta) => {
+        if (list.length < 2 || index < 0 || typeof onNavigate !== 'function') return;
+        onNavigate(list[(index + list.length + delta) % list.length]);
+      };
       useEffect(() => {
         const onKeyDown = (event) => {
           if (event.key === 'Escape') onClose();
+          if (event.key === 'ArrowLeft') event.preventDefault();
+          if (event.key === 'ArrowRight') event.preventDefault();
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
       }, [onClose]);
+      useEffect(() => {
+        if (list.length < 2 || index < 0 || typeof onNavigate !== 'function') return undefined;
+        const onKeyDown = (event) => {
+          if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            step(-1);
+          }
+          if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            step(1);
+          }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [list, attachment, onNavigate]);
       const isPdf = attachment.type === 'application/pdf';
       return h('div', {
         className: 'dsh-sp__lightbox',
@@ -1743,7 +1788,21 @@ window.__ModuleLoader__.load({
           onClick: (event) => event.stopPropagation(),
         }),
       h('div', { className: 'dsh-sp__lightboxBar', onClick: (event) => event.stopPropagation() },
+        list.length > 1 ? h('button', {
+          type: 'button',
+          className: 'dsh-sp__textBtn',
+          'aria-label': t('lightbox.close'),
+          title: '←',
+          onClick: () => step(-1),
+        }, '←') : null,
         h('span', { className: 'dsh-sp__lightboxName' }, attachment.name),
+        list.length > 1 ? h('span', { className: 'dsh-sp__lightboxCount' }, (index + 1) + '/' + list.length) : null,
+        list.length > 1 ? h('button', {
+          type: 'button',
+          className: 'dsh-sp__textBtn',
+          title: '→',
+          onClick: () => step(1),
+        }, '→') : null,
         h('button', {
           type: 'button',
           className: 'dsh-sp__textBtn',
@@ -1835,11 +1894,18 @@ window.__ModuleLoader__.load({
     // Note card
     // ---------------------------------------------------------------------
 
-    function NoteCard({ note, active, cursor, confirming, query, t, onOpen, onOpenAttachment, onTogglePin, onRequestDelete, onSend }) {
+    function NoteCard({ note, active, cursor, confirming, query, t, selectMode, selected, onToggleSelect, onOpen, onOpenAttachment, onTogglePin, onRequestDelete, onSend }) {
       const needle = typeof query === 'string' ? query.trim() : '';
       const preview = toPlainExcerpt(note.text).trim();
-      return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false', 'data-cursor': cursor ? 'true' : 'false' },
+      return h('article', { className: 'dsh-sp__note' + (note.pinned ? ' dsh-sp__note--pinned' : ''), 'data-active': active ? 'true' : 'false', 'data-cursor': cursor ? 'true' : 'false', 'data-selected': selected ? 'true' : 'false' },
         h('div', { className: 'dsh-sp__noteTop' },
+          selectMode ? h('input', {
+            type: 'checkbox',
+            className: 'dsh-sp__mdCheck',
+            checked: selected,
+            'aria-label': t('panel.select'),
+            onChange: () => onToggleSelect(note.id),
+          }) : null,
           h('time', { className: 'dsh-sp__noteTime', dateTime: new Date(note.updatedAt).toISOString() }, formatTime(note.updatedAt)),
           note.source === 'agent' ? h('span', { className: 'dsh-sp__agentFlag' }, 'Agent') : null,
           note.pinned ? h('span', { className: 'dsh-sp__pinnedFlag' }, h(PinIcon, null), t('note.pinnedFlag')) : null,
@@ -1872,12 +1938,13 @@ window.__ModuleLoader__.load({
           className: 'dsh-sp__noteOpen',
           role: 'button',
           tabIndex: 0,
-          'aria-label': t('note.open'),
-          onClick: () => onOpen(note),
+          'aria-label': selectMode ? t('panel.select') : t('note.open'),
+          onClick: () => (selectMode ? onToggleSelect(note.id) : onOpen(note)),
           onKeyDown: (event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              onOpen(note);
+              if (selectMode) onToggleSelect(note.id);
+              else onOpen(note);
             }
           },
         },
@@ -1886,7 +1953,7 @@ window.__ModuleLoader__.load({
           'data-empty': preview ? 'false' : 'true',
         }, preview ? renderInline(preview, needle) : t('note.untitled')),
         note.attachments.length > 0 ? h('span', { className: 'dsh-sp__noteAttach' },
-          note.attachments.map((attachment) => h(NoteThumb, { key: attachment.id, attachment, onOpen: onOpenAttachment }))) : null,
+          note.attachments.map((attachment) => h(NoteThumb, { key: attachment.id, attachment, onOpen: (item) => onOpenAttachment(item, note.attachments) }))) : null,
         note.tags.length > 0 ? h('span', { className: 'dsh-sp__noteTags' },
           note.tags.map((tag) => h('span', { key: tag, className: 'dsh-sp__noteTag' }, highlightNodes(`#${tag}`, needle, `tag-${tag}`)))) : null));
     }
@@ -1954,8 +2021,16 @@ window.__ModuleLoader__.load({
       const [confirmEmpty, setConfirmEmpty] = useState(false);
       const [dragging, setDragging] = useState(false);
       const [preview, setPreview] = useState(null);
+      /** Siblings of the previewed attachment, for ←/→ navigation. */
+      const [previewList, setPreviewList] = useState([]);
+      /** Bulk-selection mode over the notes feed. */
+      const [selectMode, setSelectMode] = useState(false);
+      const [selectedIds, setSelectedIds] = useState(new Set());
+      const [bulkTag, setBulkTag] = useState('');
       const [previewMode, setPreviewMode] = useState(false);
       const [importing, setImporting] = useState(false);
+      /** Staged import awaiting the merge-impact confirmation. */
+      const [importPreview, setImportPreview] = useState(null);
       const [tagDraft, setTagDraft] = useState('');
       const [selectedTag, setSelectedTag] = useState('');
       /** Whether the editor shows the note's earlier versions. */
@@ -2075,12 +2150,10 @@ window.__ModuleLoader__.load({
             if (!alive) return;
             const sorted = sortNotes(snapshot.notes);
             setNotes(sorted);
+            setTrashed(sortByDeleted(snapshot.trashed || []));
             revisionRef.current = snapshot.revision;
             setLoadError(false);
             setLoadErrorMessage('');
-            void fetchTrashList().then((result) => {
-              if (alive) setTrashed(sortByDeleted(result.notes));
-            }).catch(() => {});
             if (!restoreDraft() && sorted.length > 0) {
               // Fresh panel entry starts an empty composer: switching to the
               // panel is a new jot, not a reopen of the newest note. Editing an
@@ -2127,14 +2200,14 @@ window.__ModuleLoader__.load({
           busy = true;
           try {
             const since = revisionRef.current;
-            const [snapshot, trashResult] = await Promise.all([fetchSnapshot(since), fetchTrashList(since)]);
+            const snapshot = await fetchSnapshot(since);
             if (!alive) return;
             setLoadError(false);
             setLoadErrorMessage('');
             if (snapshot.revision === revisionRef.current) return; // nothing changed anywhere
             revisionRef.current = snapshot.revision;
             setNotes(sortNotes(snapshot.notes));
-            setTrashed(sortByDeleted(trashResult.notes));
+            setTrashed(sortByDeleted(snapshot.trashed || []));
             if (pendingRef.current) {
               void flush();
               return;
@@ -2547,8 +2620,8 @@ window.__ModuleLoader__.load({
             applyToNotes(body.note);
             const snapshot = await fetchSnapshot();
             setNotes(sortNotes(snapshot.notes));
+            setTrashed(sortByDeleted(snapshot.trashed || []));
             revisionRef.current = snapshot.revision;
-            setTrashed(sortByDeleted((await fetchTrashList()).notes));
             setSaveState('saved');
           } catch (error) {
             setNotice(error instanceof Error ? error.message : String(error));
@@ -2807,25 +2880,131 @@ window.__ModuleLoader__.load({
         })();
       }, [applyToNotes, updateEditor]);
 
-      const importBackup = useCallback(async (fileList) => {
+      /** Open the preview overlay, remembering siblings for ←/→ navigation. */
+      const openPreview = useCallback((attachment, list) => {
+        setPreviewList(Array.isArray(list) && list.length > 1 ? list : []);
+        setPreview(attachment);
+      }, []);
+
+      const toggleSelect = useCallback((id) => {
+        setSelectedIds((previous) => {
+          const next = new Set(previous);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        });
+      }, []);
+
+      const toggleSelectMode = useCallback(() => {
+        setSelectMode((value) => !value);
+        setSelectedIds(new Set());
+        setBulkTag('');
+      }, []);
+
+      /** Save each selected note with the patch applied; 409s rebase and retry. */
+      const patchNotes = useCallback(async (ids, patcher) => {
+        await Promise.all(ids.map(async (id) => {
+          let target = notes.find((note) => note.id === id);
+          for (let tries = 2; tries >= 0; tries -= 1) {
+            if (!target) return;
+            try {
+              const next = patcher(copyOf(target));
+              next.updatedAt = Date.now();
+              const body = await saveNoteRemote(next, target.updatedAt);
+              applyToNotes(body.note);
+              revisionRef.current = Math.max(revisionRef.current, body.revision || 0);
+              if (editorRef.current.id === id && !dirtyRef.current) {
+                updateEditor(copyOf(body.note));
+                baseRef.current = body.note.updatedAt;
+              }
+              return;
+            } catch (error) {
+              const stored = error?.status === 409 ? error.body?.note : null;
+              if (stored && tries > 0) {
+                target = stored;
+                continue;
+              }
+              setSaveState('error');
+              setNotice(error instanceof Error ? error.message : String(error));
+              return;
+            }
+          }
+        }));
+      }, [notes, applyToNotes, updateEditor]);
+
+      const bulkAddTag = useCallback(() => {
+        const tag = bulkTag.replace(/\s+/g, ' ').trim().slice(0, 32);
+        if (tag === '' || selectedIds.size === 0) return;
+        setBulkTag('');
+        void patchNotes([...selectedIds], (note) => {
+          note.tags = note.tags.some((item) => item.toLowerCase() === tag.toLowerCase()) ? note.tags : [...note.tags, tag];
+          return note;
+        });
+        setSelectedIds(new Set());
+      }, [bulkTag, selectedIds, patchNotes]);
+
+      const bulkDelete = useCallback(() => {
+        const ids = [...selectedIds];
+        if (ids.length === 0) return;
+        void (async () => {
+          await Promise.all(ids.map((id) => deleteNoteRemote(id).catch(() => null)));
+          const snapshot = await fetchSnapshot();
+          setNotes(sortNotes(snapshot.notes));
+          setTrashed(sortByDeleted(snapshot.trashed || []));
+          revisionRef.current = snapshot.revision;
+          setSelectedIds(new Set());
+          setSelectMode(false);
+        })();
+      }, [selectedIds]);
+
+
+      /** Stage an import: parse the file and preview the merge impact first. */
+      const stageImport = useCallback(async (fileList) => {
         const file = fileList && fileList[0];
         if (!file) return;
+        let document;
+        try {
+          document = JSON.parse(await file.text());
+        } catch {
+          setNotice(t('data.importInvalid'));
+          return;
+        }
+        const rawNotes = document !== null && typeof document === 'object'
+          && document.format === 'dsh-scratchpad' && Array.isArray(document.notes)
+          ? document.notes
+          : null;
+        const existing = new Set(notes.map((note) => note.id));
+        let newCount = 0;
+        let replaceCount = 0;
+        if (rawNotes !== null) {
+          for (const raw of rawNotes) {
+            if (raw === null || typeof raw !== 'object' || typeof raw.id !== 'string' || raw.id === '') continue;
+            if (existing.has(raw.id)) replaceCount += 1;
+            else newCount += 1;
+          }
+        }
+        if (newCount + replaceCount === 0) {
+          setNotice(t('data.importInvalid'));
+          return;
+        }
+        setImportPreview({ document, newCount, replaceCount });
+      }, [notes, t]);
+
+      /** Run the staged import after the user confirms the merge preview. */
+      const confirmImport = useCallback(async () => {
+        const staged = importPreview;
+        if (!staged) return;
+        setImportPreview(null);
         setImporting(true);
         try {
-          let document;
-          try {
-            document = JSON.parse(await file.text());
-          } catch {
-            setNotice(t('data.importInvalid'));
-            return;
-          }
           await apiJson(`${API}/import`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ mode: 'merge', document }),
+            body: JSON.stringify({ mode: 'merge', document: staged.document }),
           });
           const snapshot = await fetchSnapshot();
           setNotes(sortNotes(snapshot.notes));
+          setTrashed(sortByDeleted(snapshot.trashed || []));
           const current = editorRef.current;
           const fresh = current.id ? snapshot.notes.find((note) => note.id === current.id) : undefined;
           if (fresh && !dirtyRef.current) {
@@ -2840,7 +3019,7 @@ window.__ModuleLoader__.load({
         } finally {
           setImporting(false);
         }
-      }, [t, updateEditor]);
+      }, [importPreview, t, updateEditor]);
 
       const allTags = useMemo(() => {
         const counts = new Map();
@@ -2865,10 +3044,13 @@ window.__ModuleLoader__.load({
       }, [notes, query, selectedTag]);
 
       // The cursor indexes into the live-notes feed; reset it whenever that
-      // list changes shape (search, tag filter, view switch).
+      // list changes shape (search, tag filter, view switch). Selection too.
       useEffect(() => {
         setCursorIndex(-1);
         setRenderLimit(INITIAL_RENDER);
+        setSelectedIds(new Set());
+        setSelectMode(false);
+        setBulkTag('');
       }, [query, selectedTag, listView]);
 
       // Keep the keyboard cursor visible while it walks the feed.
@@ -2901,6 +3083,16 @@ window.__ModuleLoader__.load({
             if (next >= renderLimit) setRenderLimit(next + 24);
             return;
           }
+          if (event.key === ' ' && selectMode && cursorIndex >= 0 && !isEditableTarget(event.target)) {
+            const tag = event.target ? event.target.tagName : '';
+            if (tag === 'BUTTON' || tag === 'A') return;
+            const note = visibleNotes[cursorIndex];
+            if (note) {
+              event.preventDefault();
+              toggleSelect(note.id);
+            }
+            return;
+          }
           if (event.key === 'Enter' && cursorIndex >= 0 && !isEditableTarget(event.target)) {
             const tag = event.target ? event.target.tagName : '';
             if (tag === 'BUTTON' || tag === 'A') return;
@@ -2917,7 +3109,22 @@ window.__ModuleLoader__.load({
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-      }, [listView, cursorIndex, renderLimit, visibleNotes, openNote, preview, historyOpen]);
+      }, [listView, cursorIndex, renderLimit, visibleNotes, openNote, preview, historyOpen, selectMode, toggleSelect]);
+
+      const bulkSend = useCallback(() => {
+        const picked = visibleNotes.filter((note) => selectedIds.has(note.id));
+        const attachments = [];
+        const parts = [];
+        for (const note of picked) {
+          if (note.text.trim() !== '') parts.push(note.text.trim());
+          for (const attachment of note.attachments) attachments.push({ id: attachment.id, name: attachment.name, type: attachment.type });
+        }
+        if (parts.length === 0 && attachments.length === 0) return;
+        setSelectMode(false);
+        setSelectedIds(new Set());
+        queueComposerText(parts.join('\n\n---\n\n'), attachments);
+        sendToConversation();
+      }, [selectedIds, visibleNotes, sendToConversation]);
 
       /** Open `- [ ]` count across live notes; the badge on the to-dos tab. */
       const openTaskCount = useMemo(() => notes.reduce(
@@ -3113,7 +3320,7 @@ window.__ModuleLoader__.load({
             attachment,
             t,
             onRemove: removeAttachment,
-            onOpen: setPreview,
+            onOpen: (item) => openPreview(item, editor.attachments),
           }))) : null,
         h('div', { className: 'dsh-sp__tags' },
           editor.tags.map((tag) => h('span', { key: 'tag-' + tag, className: 'dsh-sp__tag' },
@@ -3205,6 +3412,11 @@ window.__ModuleLoader__.load({
             h('span', null, trashView ? t('trash.title') : todoView ? t('todos.title') : t('panel.listTitle')),
             h('span', null, String(trashView ? trashed.length : todoView ? openTaskCount : visibleNotes.length)),
             h('span', { className: 'dsh-sp__barSpacer' }),
+            listView === 'notes' ? h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              onClick: toggleSelectMode,
+            }, selectMode ? t('panel.cancelSelect') : t('panel.select')) : null,
             listView === 'notes' ? h('a', {
               className: 'dsh-sp__textBtn',
               href: API + '/export?attachments=1',
@@ -3241,6 +3453,48 @@ window.__ModuleLoader__.load({
               onClick: () => setListView('notes'),
             }, t('trash.back')) : null));
         feedChildren.push(toolbar);
+        if (selectMode) {
+          const everyVisible = visibleNotes.length > 0 && visibleNotes.every((note) => selectedIds.has(note.id));
+          feedChildren.push(h('div', { className: 'dsh-sp__bulkBar' },
+            h('span', { className: 'dsh-sp__status' }, t('panel.selectedCount') + ' ' + selectedIds.size),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              onClick: () => setSelectedIds(everyVisible ? new Set() : new Set(visibleNotes.map((note) => note.id))),
+            }, everyVisible ? t('panel.selectNone') : t('panel.selectAll')),
+            h('input', {
+              className: 'dsh-sp__bulkInput',
+              value: bulkTag,
+              placeholder: t('tags.add'),
+              'aria-label': t('tags.add'),
+              onChange: (event) => setBulkTag(event.target.value),
+              onKeyDown: (event) => {
+                if (event.key === 'Enter' || event.key === ',') {
+                  event.preventDefault();
+                  bulkAddTag();
+                }
+              },
+            }),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              disabled: selectedIds.size === 0 || bulkTag.trim() === '',
+              onClick: bulkAddTag,
+            }, t('panel.addTag')),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              'data-danger': 'true',
+              disabled: selectedIds.size === 0,
+              onClick: bulkDelete,
+            }, t('note.delete')),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__textBtn',
+              disabled: selectedIds.size === 0,
+              onClick: bulkSend,
+            }, t('note.send'))));
+        }
         if (allTags.length > 0) {
           feedChildren.push(h('div', {
             className: 'dsh-sp__filters',
@@ -3267,7 +3521,7 @@ window.__ModuleLoader__.load({
           accept: 'application/json,.json',
           hidden: true,
           onChange: (event) => {
-            void importBackup(event.target.files);
+            void stageImport(event.target.files);
             event.target.value = '';
           },
         }));
@@ -3357,8 +3611,11 @@ window.__ModuleLoader__.load({
                 confirming: confirmId === note.id,
                 query,
                 t,
+                selectMode,
+                selected: selectedIds.has(note.id),
+                onToggleSelect: toggleSelect,
                 onOpen: (target) => { void openNote(target); },
-                onOpenAttachment: setPreview,
+                onOpenAttachment: openPreview,
                 onTogglePin: togglePin,
                 onRequestDelete: requestDelete,
                 onSend: sendToChat,
@@ -3416,6 +3673,8 @@ window.__ModuleLoader__.load({
             h('div', { className: 'dsh-sp__feedCol' }, feedChildren)),
           preview ? h(Lightbox, {
             attachment: preview,
+            attachments: previewList,
+            onNavigate: setPreview,
             t,
             onClose: () => setPreview(null),
             onSend: sendAttachmentToChat,

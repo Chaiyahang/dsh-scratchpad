@@ -264,6 +264,7 @@ export function apply(ctx) {
   async function handleList(request) {
     const url = new URL(request.url);
     const trash = url.searchParams.get('view') === 'trash';
+    const includeTrash = url.searchParams.get('include') === 'trash';
     const state = await readState();
     // Conditional poll: when the client already holds this revision, skip the
     // payload entirely — one revision covers both the live and trash views.
@@ -271,10 +272,20 @@ export function apply(ctx) {
     if (Number.isInteger(since) && since === state.revision) {
       return json({ ok: true, revision: state.revision, unchanged: true, notes: [] });
     }
+    const live = state.notes.filter((note) => !note.deletedAt);
+    if (includeTrash && !trash) {
+      // Combined poll: both lists in one response; one revision covers both.
+      return json({
+        ok: true,
+        revision: state.revision,
+        notes: live,
+        trashed: state.notes.filter((note) => note.deletedAt),
+      });
+    }
     return json({
       ok: true,
       revision: state.revision,
-      notes: state.notes.filter((note) => (trash ? note.deletedAt : !note.deletedAt)),
+      notes: trash ? state.notes.filter((note) => note.deletedAt) : live,
     });
   }
 

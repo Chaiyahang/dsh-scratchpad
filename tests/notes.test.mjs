@@ -218,6 +218,14 @@ try {
   const trashUnchanged = await harness.request('GET', '/api/scratchpad/notes', { query: { view: 'trash', since: String(stale.body.revision) } });
   assert(trashUnchanged.body.unchanged === true, 'the trash view honors since too');
 
+  // Combined poll: one request carries the live list and the trash together.
+  await harness.request('POST', '/api/scratchpad/notes/delete', { json: { id: 'since-note' } });
+  const combined = await harness.request('GET', '/api/scratchpad/notes', { query: { include: 'trash' } });
+  assert(!combined.body.notes.some((item) => item.id === 'since-note'), 'combined poll keeps trash out of the live list');
+  assert(combined.body.trashed.some((item) => item.id === 'since-note'), 'combined poll carries the trash list');
+  const combinedUnchanged = await harness.request('GET', '/api/scratchpad/notes', { query: { include: 'trash', since: String(combined.body.revision) } });
+  assert(combinedUnchanged.body.unchanged === true, 'the combined poll honors since');
+
   // Thumb variant: upload main + thumb, link them, serve by variant.
   const mainUp = await harness.request('POST', FILES, { bytes: Buffer.from([9, 9]), query: { name: 'big.png', type: 'image/png' } });
   const thumbUp = await harness.request('POST', FILES, { bytes: Buffer.from([7]), query: { name: 'big.t.webp', type: 'image/webp' } });
