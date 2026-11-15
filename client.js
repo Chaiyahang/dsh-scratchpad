@@ -431,7 +431,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__todoRef:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;border-radius:6px}
 .dsh-sp__todoRefText{flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dsh-sp__todoRef:hover .dsh-sp__todoRefText{color:light-dark(#3574f0,#7da4ff)}
-.dsh-sp__agentFlag{flex:none;display:inline-flex;align-items:center;font-size:10.5px;line-height:1.5;color:light-dark(#7c5cd6,#a88fff);border:1px solid currentColor;border-radius:999px;padding:0 6px;margin-right:auto}
+.dsh-sp__agentFlag{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;line-height:1.5;color:light-dark(#7c5cd6,#a88fff);border:1px solid currentColor;border-radius:999px;padding:0 7px 0 6px;margin-right:auto}
 .dsh-sp__history{flex:0 1 auto;min-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
 .dsh-sp__historyItem{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 10px;background:var(--dsw-alias-bg-layer-2)}
 .dsh-sp__historyMeta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
@@ -1602,6 +1602,19 @@ window.__ModuleLoader__.load({
         h('path', { d: 'M13.5 10.5v6' }));
     }
 
+    function SparkIcon({ size = 10 }) {
+      return h('svg', {
+        viewBox: '0 0 24 24',
+        width: size,
+        height: size,
+        'aria-hidden': true,
+        focusable: 'false',
+        style: { display: 'block' },
+      },
+      h('path', { fill: 'currentColor', d: 'M11 3.5c.65 3.7 2.9 5.85 6.6 6.5-3.7.65-5.95 2.8-6.6 6.5-.65-3.7-2.9-5.85-6.6-6.5 3.7-.65 5.95-2.8 6.6-6.5z' }),
+      h('path', { fill: 'currentColor', d: 'M18.6 14.2c.3 1.7 1.3 2.7 3 3-1.7.3-2.7 1.3-3 3-.3-1.7-1.3-2.7-3-3 1.7-.3 2.7-1.3 3-3z' }));
+    }
+
     function DownloadIcon() {
       return h(LineIcon, { size: 13 },
         h('path', { d: 'M12 3.5v11' }),
@@ -1935,7 +1948,7 @@ window.__ModuleLoader__.load({
             onChange: () => onToggleSelect(note.id),
           }) : null,
           h('time', { className: 'dsh-sp__noteTime', dateTime: new Date(note.updatedAt).toISOString() }, formatTime(note.updatedAt)),
-          note.source === 'agent' ? h('span', { className: 'dsh-sp__agentFlag' }, 'Agent') : null,
+          note.source === 'agent' ? h('span', { className: 'dsh-sp__agentFlag' }, h(SparkIcon, null), 'Agent') : null,
           note.pinned ? h('span', { className: 'dsh-sp__pinnedFlag' }, h(PinIcon, null), t('note.pinnedFlag')) : null,
           h('div', { className: 'dsh-sp__noteTools' },
             h('button', {
