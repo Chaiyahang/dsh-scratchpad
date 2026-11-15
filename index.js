@@ -313,6 +313,10 @@ export function apply(ctx) {
         return false;
       }
       if (state.notes[index].text !== note.text) await recordHistory(state.notes[index]);
+      // Authorship tracks the TEXT, not the writer: metadata-only saves (pin,
+      // tags, attachments) keep the Agent flag, a text rewrite hands the note
+      // to the user. The client's own source field is never trusted.
+      note.source = state.notes[index].text === note.text ? (state.notes[index].source || null) : null;
       state.notes[index] = note;
       revision = state.revision + 1;
     });
@@ -1273,7 +1277,8 @@ function writeNote(input) {
   if (note === null) throw new HttpError(400, 'note is malformed');
   // Client saves are always live; only the delete routes soft-delete.
   note.deletedAt = 0;
-  // Every panel save is user-authored: the Agent badge tracks the last writer.
+  // Incoming client source fields are neutralized here; handleSave decides
+  // authorship against the stored note (an unchanged text keeps it).
   note.source = null;
   return note;
 }

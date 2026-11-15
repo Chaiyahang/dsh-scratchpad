@@ -23,6 +23,19 @@ try {
   await harness.runTool('scratchpad_update', { id: agentNote.id, text: 'agent again' });
   list = await harness.request('GET', '/api/scratchpad/notes');
   assert(list.body.notes[0].source === 'agent', 'an agent update re-flags the note');
+
+  // Metadata-only panel saves (pin/tags/attachments) keep the flag; only a
+  // text rewrite hands authorship to the user.
+  const sameText = await harness.request('POST', '/api/scratchpad/notes', {
+    json: { note: { ...list.body.notes[0], pinned: true } },
+  });
+  assert(sameText.status === 200, 'a metadata-only save succeeds');
+  list = await harness.request('GET', '/api/scratchpad/notes');
+  assert(list.body.notes[0].source === 'agent' && list.body.notes[0].pinned === true,
+    'a metadata-only save keeps the Agent flag');
+  await harness.request('POST', '/api/scratchpad/notes', { json: { note: { ...list.body.notes[0], text: 'now mine' } } });
+  list = await harness.request('GET', '/api/scratchpad/notes');
+  assert(!list.body.notes[0].source, 'a text rewrite clears the flag');
   console.log('pdf/source test passed');
 } finally {
   await harness.cleanup();
