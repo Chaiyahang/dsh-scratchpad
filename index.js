@@ -423,9 +423,11 @@ export function apply(ctx) {
     const url = new URL(request.url);
     const withAttachments = url.searchParams.get('attachments') !== '0';
     // Optional ids filter: the panel's bulk-selection exports just those notes.
-    const idsParam = url.searchParams.get('ids');
-    const idFilter = idsParam !== null
-      ? new Set(String(idsParam).split(',').filter((id) => /^[A-Za-z0-9-]{1,80}$/.test(id)))
+    // Accepts both ids=a,b and ids=a&ids=b — repeated params survive any
+    // percent-encoding mangling of commas along the fetch channel.
+    const rawIds = url.searchParams.getAll('ids');
+    const idFilter = rawIds.length > 0
+      ? new Set(rawIds.flatMap((value) => String(value).split(',')).filter((id) => /^[A-Za-z0-9-]{1,80}$/.test(id)))
       : null;
     const state = await readState();
     const notes = [];

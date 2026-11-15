@@ -104,6 +104,9 @@ try {
   const picked = await harness.request('GET', '/api/scratchpad/export', { query: { ids: 'note-a,does-not-exist,../etc' } });
   assert(picked.body.notes.length === 1 && picked.body.notes[0].id === 'note-a', 'export honors an ids filter');
   assert(picked.body.notes[0].attachments.length === 1, 'the filtered export still embeds attachments');
+  const picked2 = await harness.request('GET', '/api/scratchpad/export', { query: { ids: ['note-a', 'stale'] } });
+  assert(picked2.body.notes.length === 2 && picked2.body.notes.some((item) => item.id === 'stale'),
+    'export accepts repeated ids params');
 
   for (const id of ['note-a', 'tags-case', 'tags-cap', taggedId]) {
     await harness.request('POST', '/api/scratchpad/notes/delete', { json: { id } });

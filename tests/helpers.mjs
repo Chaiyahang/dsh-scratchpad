@@ -70,7 +70,10 @@ export async function createHarness() {
 
   const request = async (method, path, options = {}) => {
     const url = new URL(`http://127.0.0.1:1${path}`);
-    for (const [key, value] of Object.entries(options.query ?? {})) url.searchParams.set(key, value);
+    for (const [key, value] of Object.entries(options.query ?? {})) {
+      if (Array.isArray(value)) for (const item of value) url.searchParams.append(key, item);
+      else url.searchParams.set(key, value);
+    }
     const init = { method };
     if (options.json !== undefined) {
       init.body = JSON.stringify(options.json);

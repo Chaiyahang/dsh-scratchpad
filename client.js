@@ -120,6 +120,9 @@ window.__ModuleLoader__.load({
         'shortcut.searchShort': 'Search',
         'data.export': 'Export',
         'data.exportSelected': 'Export selected',
+        'data.exportedSelected': 'Exported',
+        'data.importFileCount': 'Notes in file:',
+        'data.importReplaceHint': 'Notes with the same id are replaced by the version in the file.',
         'data.exportHint': 'Download every note, attachments included, as one JSON file.',
         'data.import': 'Import',
         'data.importHint': 'Merge notes from a JSON backup; notes with the same id are replaced.',
@@ -234,6 +237,9 @@ window.__ModuleLoader__.load({
         'shortcut.searchShort': '搜索',
         'data.export': '导出',
         'data.exportSelected': '导出所选',
+        'data.exportedSelected': '已导出',
+        'data.importFileCount': '文件包含',
+        'data.importReplaceHint': '同 id 的便签会被文件中的版本覆盖。',
         'data.exportHint': '把全部便签（含附件）导出为一个 JSON 文件。',
         'data.import': '导入',
         'data.importHint': '从 JSON 备份合并导入；同 id 的便签会被替换。',
@@ -398,6 +404,12 @@ window.__ModuleLoader__.load({
 .dsh-sp__lightboxBar{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:70vw;padding:4px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}
 .dsh-sp__lightboxName{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dsh-sp__lightboxCount{font-size:11.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap}
+.dsh-sp__modal{display:flex;flex-direction:column;gap:10px;width:min(420px,86vw);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.dsh-sp__modalTitle{font-size:14px;font-weight:600;line-height:1.5;color:var(--dsw-alias-label-primary)}
+.dsh-sp__modalFile{font-size:12px;line-height:1.6;color:var(--dsw-alias-label-secondary);word-break:break-all}
+.dsh-sp__modalRow{display:flex;gap:14px;font-size:12.5px;line-height:1.6;color:var(--dsw-alias-label-primary)}
+.dsh-sp__modalWarn{color:var(--dsw-alias-state-warn-primary);font-weight:600}
+.dsh-sp__modalNote{font-size:11.5px;line-height:1.6;color:var(--dsw-alias-state-warn-primary)}
 .dsh-sp__note[data-selected="true"]{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
 .dsh-sp__bulkBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding:7px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}
 .dsh-sp__bulkInput{flex:1;min-width:120px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:7px;padding:3px 8px;font-size:12px;font-family:inherit;line-height:1.5;outline:none}
@@ -2993,7 +3005,7 @@ window.__ModuleLoader__.load({
           }
           setSelectMode(false);
           setSelectedIds(new Set());
-          setImportPreview({ document, newCount, replaceCount });
+          setImportPreview({ document, newCount, replaceCount, name: file.name });
         } finally {
           setImporting(false);
         }
@@ -3071,6 +3083,16 @@ window.__ModuleLoader__.load({
         }, 0);
         return () => window.clearTimeout(timer);
       }, [cursorIndex, ready]);
+
+      // The import confirmation is modal: Esc dismisses it.
+      useEffect(() => {
+        if (!importPreview) return undefined;
+        const onKeyDown = (event) => {
+          if (event.key === 'Escape') setImportPreview(null);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+      }, [importPreview]);
 
       // ↑/↓ walk the feed, ↵ opens, Esc dismisses. Typing surfaces keep their
       // keys; the search box hands off with ↓/↑ without leaving the box.
@@ -3416,20 +3438,6 @@ window.__ModuleLoader__.load({
         feedChildren.push(trash ? h('div', { className: 'dsh-sp__trash', role: 'status' },
           h('span', null, t('panel.deleted')),
           h('button', { type: 'button', className: 'dsh-sp__textBtn', onClick: undoDelete }, t('panel.undo'))) : null);
-        feedChildren.push(importPreview ? h('div', { className: 'dsh-sp__trash', role: 'alert' },
-          h('span', null, t('data.importNew') + ' ' + importPreview.newCount + ' · ' + t('data.importReplace') + ' ' + importPreview.replaceCount),
-          h('button', {
-            type: 'button',
-            className: 'dsh-sp__textBtn',
-            disabled: importing,
-            onClick: () => { void confirmImport(); },
-          }, t('data.importConfirm')),
-          h('button', {
-            type: 'button',
-            className: 'dsh-sp__textBtn',
-            disabled: importing,
-            onClick: () => setImportPreview(null),
-          }, t('data.importCancel'))) : null);
         const toolbar = h('div', { className: 'dsh-sp__toolbar' },
           h('div', { className: 'dsh-sp__listHeader' },
             h('span', null, trashView ? t('trash.title') : todoView ? t('todos.title') : t('panel.listTitle')),
@@ -3448,8 +3456,15 @@ window.__ModuleLoader__.load({
             listView === 'notes' && selectMode ? (selectedIds.size > 0
               ? h('a', {
                 className: 'dsh-sp__textBtn',
-                href: API + '/export?attachments=1&ids=' + encodeURIComponent([...selectedIds].join(',')),
+                href: API + '/export?attachments=1&' + [...selectedIds].map((id) => 'ids=' + encodeURIComponent(id)).join('&'),
                 title: t('data.exportHint'),
+                onClick: () => {
+                  setNotice(t('data.exportedSelected') + ' ' + selectedIds.size);
+                  window.setTimeout(() => {
+                    setSelectMode(false);
+                    setSelectedIds(new Set());
+                  }, 0);
+                },
               }, t('data.exportSelected') + ' ' + selectedIds.size)
               : h('span', { className: 'dsh-sp__textBtn', 'aria-disabled': 'true', style: { opacity: .45, cursor: 'default' } }, t('data.exportSelected'))) : null,
             listView === 'notes' && !selectMode ? h('button', {
@@ -3709,7 +3724,37 @@ window.__ModuleLoader__.load({
             onClose: () => setPreview(null),
             onSend: sendAttachmentToChat,
             onSaveNote: saveAttachmentAsNote,
-          }) : null));
+          }) : null,
+          importPreview ? h('div', {
+            className: 'dsh-sp__lightbox',
+            role: 'dialog',
+            'aria-modal': 'true',
+            'aria-label': t('data.importConfirm'),
+            onClick: () => setImportPreview(null),
+          },
+          h('div', { className: 'dsh-sp__modal', onClick: (event) => event.stopPropagation() },
+            h('div', { className: 'dsh-sp__modalTitle' }, t('data.importConfirm')),
+            h('div', { className: 'dsh-sp__modalFile' }, importPreview.name),
+            h('div', { className: 'dsh-sp__modalRow' },
+              h('span', null, t('data.importFileCount') + ' ' + (importPreview.newCount + importPreview.replaceCount))),
+            h('div', { className: 'dsh-sp__modalRow' },
+              h('span', null, t('data.importNew') + ' ' + importPreview.newCount),
+              importPreview.replaceCount > 0 ? h('span', { className: 'dsh-sp__modalWarn' }, t('data.importReplace') + ' ' + importPreview.replaceCount) : null),
+            importPreview.replaceCount > 0 ? h('div', { className: 'dsh-sp__modalNote' }, t('data.importReplaceHint')) : null,
+            h('div', { className: 'dsh-sp__bar' },
+              h('span', { className: 'dsh-sp__barSpacer' }),
+              h('button', {
+                type: 'button',
+                className: 'dsh-sp__textBtn',
+                disabled: importing,
+                onClick: () => setImportPreview(null),
+              }, t('data.importCancel')),
+              h('button', {
+                type: 'button',
+                className: 'dsh-sp__new',
+                disabled: importing,
+                onClick: () => { void confirmImport(); },
+              }, importing ? t('data.importing') : t('data.importConfirm'))))) : null));
     }
 
     return {
