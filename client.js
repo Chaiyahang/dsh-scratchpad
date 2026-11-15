@@ -119,6 +119,7 @@ window.__ModuleLoader__.load({
         'shortcut.newShort': 'New',
         'shortcut.searchShort': 'Search',
         'data.export': 'Export',
+        'data.exportSelected': 'Export selected',
         'data.exportHint': 'Download every note, attachments included, as one JSON file.',
         'data.import': 'Import',
         'data.importHint': 'Merge notes from a JSON backup; notes with the same id are replaced.',
@@ -232,6 +233,7 @@ window.__ModuleLoader__.load({
         'shortcut.newShort': '新建',
         'shortcut.searchShort': '搜索',
         'data.export': '导出',
+        'data.exportSelected': '导出所选',
         'data.exportHint': '把全部便签（含附件）导出为一个 JSON 文件。',
         'data.import': '导入',
         'data.importHint': '从 JSON 备份合并导入；同 id 的便签会被替换。',
@@ -2962,32 +2964,39 @@ window.__ModuleLoader__.load({
       const stageImport = useCallback(async (fileList) => {
         const file = fileList && fileList[0];
         if (!file) return;
-        let document;
+        setImporting(true);
         try {
-          document = JSON.parse(await file.text());
-        } catch {
-          setNotice(t('data.importInvalid'));
-          return;
-        }
-        const rawNotes = document !== null && typeof document === 'object'
-          && document.format === 'dsh-scratchpad' && Array.isArray(document.notes)
-          ? document.notes
-          : null;
-        const existing = new Set(notes.map((note) => note.id));
-        let newCount = 0;
-        let replaceCount = 0;
-        if (rawNotes !== null) {
-          for (const raw of rawNotes) {
-            if (raw === null || typeof raw !== 'object' || typeof raw.id !== 'string' || raw.id === '') continue;
-            if (existing.has(raw.id)) replaceCount += 1;
-            else newCount += 1;
+          let document;
+          try {
+            document = JSON.parse(await file.text());
+          } catch {
+            setNotice(t('data.importInvalid'));
+            return;
           }
+          const rawNotes = document !== null && typeof document === 'object'
+            && document.format === 'dsh-scratchpad' && Array.isArray(document.notes)
+            ? document.notes
+            : null;
+          const existing = new Set(notes.map((note) => note.id));
+          let newCount = 0;
+          let replaceCount = 0;
+          if (rawNotes !== null) {
+            for (const raw of rawNotes) {
+              if (raw === null || typeof raw !== 'object' || typeof raw.id !== 'string' || raw.id === '') continue;
+              if (existing.has(raw.id)) replaceCount += 1;
+              else newCount += 1;
+            }
+          }
+          if (newCount + replaceCount === 0) {
+            setNotice(t('data.importInvalid'));
+            return;
+          }
+          setSelectMode(false);
+          setSelectedIds(new Set());
+          setImportPreview({ document, newCount, replaceCount });
+        } finally {
+          setImporting(false);
         }
-        if (newCount + replaceCount === 0) {
-          setNotice(t('data.importInvalid'));
-          return;
-        }
-        setImportPreview({ document, newCount, replaceCount });
       }, [notes, t]);
 
       /** Run the staged import after the user confirms the merge preview. */
@@ -3407,6 +3416,20 @@ window.__ModuleLoader__.load({
         feedChildren.push(trash ? h('div', { className: 'dsh-sp__trash', role: 'status' },
           h('span', null, t('panel.deleted')),
           h('button', { type: 'button', className: 'dsh-sp__textBtn', onClick: undoDelete }, t('panel.undo'))) : null);
+        feedChildren.push(importPreview ? h('div', { className: 'dsh-sp__trash', role: 'alert' },
+          h('span', null, t('data.importNew') + ' ' + importPreview.newCount + ' · ' + t('data.importReplace') + ' ' + importPreview.replaceCount),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__textBtn',
+            disabled: importing,
+            onClick: () => { void confirmImport(); },
+          }, t('data.importConfirm')),
+          h('button', {
+            type: 'button',
+            className: 'dsh-sp__textBtn',
+            disabled: importing,
+            onClick: () => setImportPreview(null),
+          }, t('data.importCancel'))) : null);
         const toolbar = h('div', { className: 'dsh-sp__toolbar' },
           h('div', { className: 'dsh-sp__listHeader' },
             h('span', null, trashView ? t('trash.title') : todoView ? t('todos.title') : t('panel.listTitle')),
@@ -3417,12 +3440,19 @@ window.__ModuleLoader__.load({
               className: 'dsh-sp__textBtn',
               onClick: toggleSelectMode,
             }, selectMode ? t('panel.cancelSelect') : t('panel.select')) : null,
-            listView === 'notes' ? h('a', {
+            listView === 'notes' && !selectMode ? h('a', {
               className: 'dsh-sp__textBtn',
               href: API + '/export?attachments=1',
               title: t('data.exportHint'),
             }, t('data.export')) : null,
-            listView === 'notes' ? h('button', {
+            listView === 'notes' && selectMode ? (selectedIds.size > 0
+              ? h('a', {
+                className: 'dsh-sp__textBtn',
+                href: API + '/export?attachments=1&ids=' + encodeURIComponent([...selectedIds].join(',')),
+                title: t('data.exportHint'),
+              }, t('data.exportSelected') + ' ' + selectedIds.size)
+              : h('span', { className: 'dsh-sp__textBtn', 'aria-disabled': 'true', style: { opacity: .45, cursor: 'default' } }, t('data.exportSelected'))) : null,
+            listView === 'notes' && !selectMode ? h('button', {
               type: 'button',
               className: 'dsh-sp__textBtn',
               title: t('data.importHint'),

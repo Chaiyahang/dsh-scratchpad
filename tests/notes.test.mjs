@@ -99,6 +99,12 @@ try {
     'full export embeds attachment bytes',
   );
 
+  // Export filter: ids= picks just those notes, attachments included; unknown
+  // ids are ignored and hostile tokens dropped by the id allowlist.
+  const picked = await harness.request('GET', '/api/scratchpad/export', { query: { ids: 'note-a,does-not-exist,../etc' } });
+  assert(picked.body.notes.length === 1 && picked.body.notes[0].id === 'note-a', 'export honors an ids filter');
+  assert(picked.body.notes[0].attachments.length === 1, 'the filtered export still embeds attachments');
+
   for (const id of ['note-a', 'tags-case', 'tags-cap', taggedId]) {
     await harness.request('POST', '/api/scratchpad/notes/delete', { json: { id } });
   }

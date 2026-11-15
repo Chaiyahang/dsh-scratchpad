@@ -422,10 +422,16 @@ export function apply(ctx) {
   async function handleExport(request) {
     const url = new URL(request.url);
     const withAttachments = url.searchParams.get('attachments') !== '0';
+    // Optional ids filter: the panel's bulk-selection exports just those notes.
+    const idsParam = url.searchParams.get('ids');
+    const idFilter = idsParam !== null
+      ? new Set(String(idsParam).split(',').filter((id) => /^[A-Za-z0-9-]{1,80}$/.test(id)))
+      : null;
     const state = await readState();
     const notes = [];
     for (const note of state.notes) {
       if (note.deletedAt) continue;
+      if (idFilter !== null && !idFilter.has(note.id)) continue;
       const attachments = [];
       for (const attachment of note.attachments) {
         const entry = {
