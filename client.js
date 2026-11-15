@@ -132,6 +132,8 @@ window.__ModuleLoader__.load({
         'tags.filter': 'Filter by tag',
         'lightbox.close': 'Close preview',
         'lightbox.download': 'Download',
+        'lightbox.send': 'Send to chat',
+        'lightbox.saveNote': 'Save as note',
       },
       zh: {
         'panel.title': '便签',
@@ -233,6 +235,8 @@ window.__ModuleLoader__.load({
         'tags.filter': '按标签筛选',
         'lightbox.close': '关闭预览',
         'lightbox.download': '下载',
+        'lightbox.send': '发到对话',
+        'lightbox.saveNote': '存为便签',
       },
     };
 
@@ -1709,7 +1713,7 @@ window.__ModuleLoader__.load({
       return h('span', { className: 'dsh-sp__thumb', title }, extensionOf(attachment.name));
     }
 
-    function Lightbox({ attachment, onClose, t }) {
+    function Lightbox({ attachment, onClose, t, onSend, onSaveNote }) {
       useEffect(() => {
         const onKeyDown = (event) => {
           if (event.key === 'Escape') onClose();
@@ -1740,6 +1744,18 @@ window.__ModuleLoader__.load({
         }),
       h('div', { className: 'dsh-sp__lightboxBar', onClick: (event) => event.stopPropagation() },
         h('span', { className: 'dsh-sp__lightboxName' }, attachment.name),
+        h('button', {
+          type: 'button',
+          className: 'dsh-sp__textBtn',
+          title: t('note.send'),
+          onClick: () => onSend(attachment),
+        }, t('lightbox.send')),
+        h('button', {
+          type: 'button',
+          className: 'dsh-sp__textBtn',
+          title: t('lightbox.saveNote'),
+          onClick: () => onSaveNote(attachment),
+        }, t('lightbox.saveNote')),
         isPdf ? h('a', {
           className: 'dsh-sp__textBtn',
           href: attachmentUrl(attachment.id, true),
@@ -2754,6 +2770,43 @@ window.__ModuleLoader__.load({
         sendToConversation();
       }, [sendToConversation]);
 
+      /** Send a single attachment to the composer (attachment-only handoff). */
+      const sendAttachmentToChat = useCallback((attachment) => {
+        if (!attachment) return;
+        setPreview(null);
+        queueComposerText('', [{ id: attachment.id, name: attachment.name, type: attachment.type }]);
+        sendToConversation();
+      }, [sendToConversation]);
+
+      /** Save an attachment into a new note and open it in the composer. */
+      const saveAttachmentAsNote = useCallback((attachment) => {
+        if (!attachment) return;
+        void (async () => {
+          try {
+            const now = Date.now();
+            const note = {
+              id: newId(),
+              text: String(attachment.name || '').replace(/\.[^.]+$/, ''),
+              tags: [],
+              pinned: false,
+              createdAt: now,
+              updatedAt: now,
+              attachments: [attachment],
+            };
+            const body = await saveNoteRemote(note);
+            applyToNotes(body.note);
+            revisionRef.current = Math.max(revisionRef.current, body.revision || 0);
+            setPreview(null);
+            updateEditor(copyOf(body.note));
+            baseRef.current = body.note.updatedAt;
+            setSaveState('saved');
+            setComposerOpen(true);
+          } catch (error) {
+            setNotice(error instanceof Error ? error.message : String(error));
+          }
+        })();
+      }, [applyToNotes, updateEditor]);
+
       const importBackup = useCallback(async (fileList) => {
         const file = fileList && fileList[0];
         if (!file) return;
@@ -3361,7 +3414,13 @@ window.__ModuleLoader__.load({
                 : composerCard,
               aboutCard) : null,
             h('div', { className: 'dsh-sp__feedCol' }, feedChildren)),
-          preview ? h(Lightbox, { attachment: preview, t, onClose: () => setPreview(null) }) : null));
+          preview ? h(Lightbox, {
+            attachment: preview,
+            t,
+            onClose: () => setPreview(null),
+            onSend: sendAttachmentToChat,
+            onSaveNote: saveAttachmentAsNote,
+          }) : null));
     }
 
     return {
