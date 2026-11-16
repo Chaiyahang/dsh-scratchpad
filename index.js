@@ -32,6 +32,13 @@ const SNAPSHOT_DIR = 'snapshots';
 const SNAPSHOT_KEEP = 7;
 /** Prior texts kept per note, newest first; the file lives outside notes.json. */
 const MAX_NOTE_HISTORY = 10;
+/**
+ * Consecutive auto-saves within this window count as one editing burst: only
+ * the text at the burst's start is recorded, so a minute of typing cannot fill
+ * the 10 slots with half-typed snapshots. Explicit checkpoints (⌘S, 记一下,
+ * Agent edits, imports) record regardless of the window.
+ */
+const HISTORY_MERGE_WINDOW_MS = 10 * 60 * 1000;
 
 /** A request-level failure with the HTTP status the channel should report. */
 class HttpError extends Error {
@@ -175,15 +182,19 @@ export function apply(ctx) {
   }
 
   /**
-   * Push the outgoing text of a note onto its history. Called INSIDE the
+   * Push the outgoing text of a note onto its history. Auto-saves merge by
+   * the burst window; checkpoints record unconditionally. Called INSIDE the
    * mutation queue (never enqueue from here — that would deadlock), and its
    * own failures are logged, never allowed to fail the save itself.
    */
-  async function recordHistory(note) {
+  async function recordHistory(note, checkpoint) {
     if (!note || typeof note.id !== 'string' || typeof note.text !== 'string') return;
     try {
       const doc = await loadHistory();
       const entries = doc.entries[note.id] || (doc.entries[note.id] = []);
+      const newest = entries[0];
+      if (newest && newest.text === note.text) return;
+      if (checkpoint !== true && newest && note.updatedAt - newest.updatedAt < HISTORY_MERGE_WINDOW_MS) return;
       entries.unshift({ text: note.text, updatedAt: note.updatedAt });
       if (entries.length > MAX_NOTE_HISTORY) entries.length = MAX_NOTE_HISTORY;
       await writeHistory();
@@ -273,19 +284,23 @@ export function apply(ctx) {
       return json({ ok: true, revision: state.revision, unchanged: true, notes: [] });
     }
     const live = state.notes.filter((note) => !note.deletedAt);
+    // The client hides the history button for notes without recorded versions,
+    // so each live note carries its count (history is in memory — free here).
+    const hist = await loadHistory();
+    const withCount = (note) => ({ ...note, historyCount: hist.entries[note.id]?.length ?? 0 });
     if (includeTrash && !trash) {
       // Combined poll: both lists in one response; one revision covers both.
       return json({
         ok: true,
         revision: state.revision,
-        notes: live,
+        notes: live.map(withCount),
         trashed: state.notes.filter((note) => note.deletedAt),
       });
     }
     return json({
       ok: true,
       revision: state.revision,
-      notes: trash ? state.notes.filter((note) => note.deletedAt) : live,
+      notes: trash ? state.notes.filter((note) => note.deletedAt) : live.map(withCount),
     });
   }
 
@@ -305,6 +320,9 @@ export function apply(ctx) {
       const index = state.notes.findIndex((item) => item.id === note.id);
       if (index < 0) {
         state.notes.push(note);
+        // A checkpointed first save (记一下 / ⌘S on a new note) records the
+        // finished version, so it can be restored after later edits.
+        if (body?.checkpoint === true) await recordHistory(note, true);
         revision = state.revision + 1;
         return;
       }
@@ -312,7 +330,12 @@ export function apply(ctx) {
         stored = state.notes[index];
         return false;
       }
-      if (state.notes[index].text !== note.text) await recordHistory(state.notes[index]);
+      // Checkpoints record even when the text is unchanged: the autosave may
+      // have persisted this text milliseconds before ⌘S arrived, and ⌘S must
+      // still make it a version (recordHistory dedupes identical texts).
+      if (state.notes[index].text !== note.text || body?.checkpoint === true) {
+        await recordHistory(state.notes[index], body?.checkpoint === true);
+      }
       // Authorship tracks the TEXT, not the writer: metadata-only saves (pin,
       // tags, attachments) keep the Agent flag, a text rewrite hands the note
       // to the user. The client's own source field is never trusted.
@@ -327,7 +350,10 @@ export function apply(ctx) {
         note: stored,
       }, 409);
     }
-    return json({ ok: true, revision, note });
+    // The response carries the fresh history count so the panel can show or
+    // hide the history button immediately after a checkpoint save.
+    const histDoc = await loadHistory();
+    return json({ ok: true, revision, note: { ...note, historyCount: histDoc.entries[note.id]?.length ?? 0 } });
   }
 
   async function handleDeleteNote(request) {
@@ -564,7 +590,7 @@ export function apply(ctx) {
         const next = note.attachments.length === 0 && current.attachments.length > 0
           ? { ...note, attachments: current.attachments }
           : note;
-        if (current.text !== next.text) await recordHistory(current);
+        if (current.text !== next.text) await recordHistory(current, true);
         if (next.attachments !== current.attachments) removed.push(...current.attachments);
         state.notes[index] = next;
       }
@@ -985,7 +1011,7 @@ export function apply(ctx) {
         await mutate(async (current) => {
           const note = findNote(current, id);
           if (!note) return;
-          await recordHistory(note);
+          await recordHistory(note, true);
           note.text = note.text.trimEnd() === '' ? addition : `${note.text.trimEnd()}\n${addition}`;
           note.updatedAt = Date.now();
           note.source = 'agent';
@@ -1017,7 +1043,7 @@ export function apply(ctx) {
         await mutate(async (current) => {
           const note = findNote(current, id);
           if (!note) return;
-          if (note.text !== text) await recordHistory(note);
+          if (note.text !== text) await recordHistory(note, true);
           note.text = text;
           if (Array.isArray(args?.tags)) note.tags = readTags(args.tags);
           note.updatedAt = Date.now();

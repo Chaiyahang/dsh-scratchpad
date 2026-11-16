@@ -424,10 +424,10 @@ window.__ModuleLoader__.load({
 .dsh-sp__toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:70;max-width:80vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-base);border-radius:999px;padding:8px 18px;font-size:12.5px;line-height:1.5;font-family:inherit;box-shadow:0 6px 24px rgba(0,0,0,.25);cursor:pointer}
 .dsh-sp__chipBtn{border:1px solid var(--dsw-alias-border-l1);border-radius:999px;padding:1px 10px}
 .dsh-sp__chipBtn:hover{border-color:light-dark(#3574f0,#7da4ff)}
-.dsh-sp__listScroll,.dsh-sp__textarea,.dsh-sp__preview{scrollbar-width:thin;scrollbar-color:var(--dsw-alias-border-l2) transparent}
-.dsh-sp__listScroll::-webkit-scrollbar,.dsh-sp__textarea::-webkit-scrollbar,.dsh-sp__preview::-webkit-scrollbar{width:8px;height:8px}
-.dsh-sp__listScroll::-webkit-scrollbar-thumb,.dsh-sp__textarea::-webkit-scrollbar-thumb,.dsh-sp__preview::-webkit-scrollbar-thumb{background:var(--dsw-alias-border-l2);border-radius:4px}
-.dsh-sp__listScroll::-webkit-scrollbar-track,.dsh-sp__textarea::-webkit-scrollbar-track,.dsh-sp__preview::-webkit-scrollbar-track{background:transparent}
+.dsh-sp__listScroll,.dsh-sp__textarea,.dsh-sp__preview,.dsh-sp__historyList{scrollbar-width:thin;scrollbar-color:var(--dsw-alias-border-l2) transparent}
+.dsh-sp__listScroll::-webkit-scrollbar,.dsh-sp__textarea::-webkit-scrollbar,.dsh-sp__preview::-webkit-scrollbar,.dsh-sp__historyList::-webkit-scrollbar{width:8px;height:8px}
+.dsh-sp__listScroll::-webkit-scrollbar-thumb,.dsh-sp__textarea::-webkit-scrollbar-thumb,.dsh-sp__preview::-webkit-scrollbar-thumb,.dsh-sp__historyList::-webkit-scrollbar-thumb{background:var(--dsw-alias-border-l2);border-radius:4px}
+.dsh-sp__listScroll::-webkit-scrollbar-track,.dsh-sp__textarea::-webkit-scrollbar-track,.dsh-sp__preview::-webkit-scrollbar-track,.dsh-sp__historyList::-webkit-scrollbar-track{background:transparent}
 .dsh-sp__note[data-selected="true"]{border-color:light-dark(#3574f0,#7da4ff);background:light-dark(#3574f00d,#7da4ff1a)}
 .dsh-sp__bulkBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding:7px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}
 .dsh-sp__bulkInput{flex:1;min-width:120px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:7px;padding:3px 8px;font-size:12px;font-family:inherit;line-height:1.5;outline:none}
@@ -443,7 +443,10 @@ window.__ModuleLoader__.load({
 .dsh-sp__todoRefText{flex:1;min-width:0;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dsh-sp__todoRef:hover .dsh-sp__todoRefText{color:light-dark(#3574f0,#7da4ff)}
 .dsh-sp__agentFlag{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:10.5px;line-height:1.5;color:light-dark(#7c5cd6,#a88fff);border:1px solid currentColor;border-radius:999px;padding:0 7px 0 6px}
-.dsh-sp__history{flex:0 1 auto;min-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.dsh-sp__history{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:10px}
+.dsh-sp__historyList{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:12px}
+.dsh-sp__historyBar{background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:10px;padding:8px 12px}
+.dsh-sp__historyTitle{font-size:12.5px;font-weight:600;line-height:1.5;color:var(--dsw-alias-label-primary)}
 .dsh-sp__historyItem{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 10px;background:var(--dsw-alias-bg-layer-2)}
 .dsh-sp__historyMeta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
 .dsh-sp__historyText{margin-top:2px;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
@@ -480,13 +483,17 @@ window.__ModuleLoader__.load({
     /**
      * Save one note. `baseUpdatedAt` is the updatedAt the caller last synced:
      * when provided and the stored note moved on, the Host refuses with 409 and
-     * its current version. Omitting it saves unconditionally.
+     * its current version. Omitting it saves unconditionally. `checkpoint`
+     * marks an explicit save (⌘S, 记一下) whose previous text always enters
+     * history, bypassing the burst-merge window.
      */
-    async function saveNoteRemote(note, baseUpdatedAt) {
+    async function saveNoteRemote(note, baseUpdatedAt, checkpoint) {
+      const body = baseUpdatedAt === undefined ? { note } : { note, baseUpdatedAt };
+      if (checkpoint === true) body.checkpoint = true;
       return apiJson(`${API}/notes`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(baseUpdatedAt === undefined ? { note } : { note, baseUpdatedAt }),
+        body: JSON.stringify(body),
       });
     }
 
@@ -2147,18 +2154,40 @@ window.__ModuleLoader__.load({
         });
       }, []);
 
-      const flush = useCallback(async () => {
-        const note = pendingRef.current;
-        if (!note) return true;
+      const flush = useCallback(async (checkpoint) => {
+        const note = pendingRef.current ?? (checkpoint === true ? editorRef.current : null);
         pendingRef.current = null;
+        if (!note) return true;
+        // A fully emptied note (no text, tags or attachments) holds nothing:
+        // drop the row instead of persisting a blank card.
+        const blank = note.text.trim() === '' && note.attachments.length === 0 && note.tags.length === 0;
+        if (blank && note.id) {
+          // Nothing in it — hard-delete so the trash stays clean too.
+          void deleteNoteRemote(note.id, true).catch(() => {});
+          setNotes((previous) => previous.filter((item) => item.id !== note.id));
+          if (editorRef.current.id === note.id) {
+            dirtyRef.current = false;
+            setConflict(null);
+            baseRef.current = 0;
+            updateEditor(emptyEditor());
+          }
+          window.clearTimeout(draftTimerRef.current);
+          clearDraft();
+          setSaveState('idle');
+          return true;
+        }
         if (!note.id) {
           setSaveState('idle');
-          return;
+          return true;
         }
         setSaveState('saving');
         try {
-          const body = await saveNoteRemote(note, baseRef.current || undefined);
+          const body = await saveNoteRemote(note, baseRef.current || undefined, checkpoint === true);
           applyToNotes(body.note);
+          if (editorRef.current.id === note.id && body.note.historyCount !== undefined) {
+            // Keep the history button in sync with the saved version's count.
+            updateEditor({ ...editorRef.current, historyCount: body.note.historyCount });
+          }
           baseRef.current = body.note.updatedAt;
           revisionRef.current = Math.max(revisionRef.current, body.revision || 0);
           if (!pendingRef.current) {
@@ -2486,7 +2515,7 @@ window.__ModuleLoader__.load({
       }, [queueDraft, scheduleSave, updateEditor]);
 
       const startDraft = useCallback(async () => {
-        const saved = await flush();
+        const saved = await flush(true);
         if (saved) clearDraft();
         dirtyRef.current = false;
         setConflict(null);
@@ -2550,7 +2579,7 @@ window.__ModuleLoader__.load({
           textareaRef.current?.focus();
           return;
         }
-        const saved = await flush();
+        const saved = await flush(true);
         if (saved) clearDraft();
         dirtyRef.current = false;
         setConflict(null);
@@ -2881,11 +2910,20 @@ window.__ModuleLoader__.load({
           void startDraft();
           return;
         }
+        if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+          // Explicit save: flush now as a history checkpoint (also keeps the
+          // browser/webview save dialog away).
+          event.preventDefault();
+          window.clearTimeout(timerRef.current);
+          pendingRef.current = editorRef.current;
+          void flush(true);
+          return;
+        }
         if ((event.metaKey || event.ctrlKey) && (event.key === 'b' || event.key === 'i')) {
           event.preventDefault();
           wrapSelection(event.key === 'b' ? '**' : '*');
         }
-      }, [startDraft, wrapSelection]);
+      }, [startDraft, wrapSelection, flush]);
 
       /** ⌘/Ctrl-click opens the URL under the caret without leaving edit mode. */
       const onEditorClick = useCallback((event) => {
@@ -3167,21 +3205,33 @@ window.__ModuleLoader__.load({
         return () => window.clearTimeout(timer);
       }, [cursorIndex, ready]);
 
-      // The import confirmation is modal: Esc dismisses it.
+      // The import confirmation is modal: Esc dismisses it. Esc also leaves
+      // the history view.
       useEffect(() => {
-        if (!importPreview) return undefined;
+        if (!importPreview && !historyOpen) return undefined;
         const onKeyDown = (event) => {
-          if (event.key === 'Escape') setImportPreview(null);
+          if (event.key !== 'Escape') return;
+          if (importPreview) setImportPreview(null);
+          else if (historyOpen) setHistoryOpen(false);
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-      }, [importPreview]);
+      }, [importPreview, historyOpen]);
 
       // ↑/↓ walk the feed, ↵ opens, Esc dismisses. Typing surfaces keep their
       // keys; the search box hands off with ↓/↑ without leaving the box.
       useEffect(() => {
         if (listView !== 'notes') return undefined;
         const onKeyDown = (event) => {
+          // ⌘⇧H toggles the history view from anywhere in the panel.
+          if ((event.metaKey || event.ctrlKey) && event.shiftKey && (event.key === 'h' || event.key === 'H')) {
+            event.preventDefault();
+            if (editorRef.current.id) {
+              if (historyOpen) setHistoryOpen(false);
+              else void openHistory();
+            }
+            return;
+          }
           if (event.metaKey || event.ctrlKey || event.altKey) return;
           if (preview || historyOpen) return;
           const inSearch = event.target === searchInputRef.current;
@@ -3223,7 +3273,7 @@ window.__ModuleLoader__.load({
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-      }, [listView, cursorIndex, renderLimit, visibleNotes, openNote, preview, historyOpen, selectMode, toggleSelect]);
+      }, [listView, cursorIndex, renderLimit, visibleNotes, openNote, preview, historyOpen, openHistory, selectMode, toggleSelect]);
 
       const bulkSend = useCallback(() => {
         const picked = visibleNotes.filter((note) => selectedIds.has(note.id));
@@ -3362,13 +3412,14 @@ window.__ModuleLoader__.load({
       const statusBar = h('div', { className: 'dsh-sp__bar' },
         h('span', { className: 'dsh-sp__status', 'data-error': saveState === 'error' ? 'true' : 'false' },
           t('editor.chars') + ' ' + editor.text.length + (statusLabel ? ' · ' + statusLabel : '')),
-        editor.id ? h('button', {
+        editor.id && editor.historyCount > 0 ? h('button', {
           type: 'button',
-          className: 'dsh-sp__textBtn',
-          title: t('history.open'),
+          className: 'dsh-sp__textBtn dsh-sp__chipBtn',
+          title: t('history.open') + ' ' + (isMacPlatform() ? '⌘⇧H' : 'Ctrl+⇧H'),
           'aria-label': t('history.open'),
           onClick: () => { void openHistory(); },
-        }, t('history.title')) : null,
+        }, t('history.title'), h('span', { className: 'dsh-sp__jotKbd' }, isMacPlatform() ? '⌘⇧H' : 'Ctrl+⇧H')) : null,
+
         h('span', { className: 'dsh-sp__barSpacer' }),
         h('button', {
           type: 'button',
@@ -3378,27 +3429,29 @@ window.__ModuleLoader__.load({
         }, t('editor.jot'), h('span', { className: 'dsh-sp__jotKbd' }, isMacPlatform() ? '⌘↵' : 'Ctrl+↵')));
 
       const historyBody = h('div', { className: 'dsh-sp__history' },
-        h('div', { className: 'dsh-sp__bar' },
-          h('span', { className: 'dsh-sp__status' }, t('history.title')),
+        h('div', { className: 'dsh-sp__bar dsh-sp__historyBar' },
+          h('span', { className: 'dsh-sp__historyTitle' }, t('history.title')),
           h('span', { className: 'dsh-sp__barSpacer' }),
           h('button', {
             type: 'button',
-            className: 'dsh-sp__textBtn',
+            className: 'dsh-sp__textBtn dsh-sp__chipBtn',
+            title: 'Esc',
             onClick: () => setHistoryOpen(false),
-          }, t('history.close'))),
-        historyItems === null
-          ? h('span', { className: 'dsh-sp__previewEmpty' }, t('panel.loading'))
-          : historyItems.length === 0
-            ? h('span', { className: 'dsh-sp__previewEmpty' }, t('history.empty'))
-            : historyItems.map((entry, index) => h('div', { key: entry.updatedAt + '-' + index, className: 'dsh-sp__historyItem' },
-              h('div', { className: 'dsh-sp__historyMeta' },
-                h('time', { dateTime: new Date(entry.updatedAt).toISOString() }, formatTime(entry.updatedAt)),
-                h('button', {
-                  type: 'button',
-                  className: 'dsh-sp__textBtn',
-                  onClick: () => restoreHistoryVersion(entry),
-                }, t('history.restore'))),
-              h('div', { className: 'dsh-sp__historyText' }, toPlainExcerpt(entry.text).trim() || t('note.untitled')))));
+          }, t('history.close') + (isMacPlatform() ? ' esc' : ' Esc'))),
+        h('div', { className: 'dsh-sp__historyList' },
+          historyItems === null
+            ? h('span', { className: 'dsh-sp__previewEmpty' }, t('panel.loading'))
+            : historyItems.length === 0
+              ? h('span', { className: 'dsh-sp__previewEmpty' }, t('history.empty'))
+              : historyItems.map((entry, index) => h('div', { key: entry.updatedAt + '-' + index, className: 'dsh-sp__historyItem' },
+                h('div', { className: 'dsh-sp__historyMeta' },
+                  h('time', { dateTime: new Date(entry.updatedAt).toISOString() }, formatTime(entry.updatedAt)),
+                  h('button', {
+                    type: 'button',
+                    className: 'dsh-sp__textBtn',
+                    onClick: () => restoreHistoryVersion(entry),
+                  }, t('history.restore'))),
+                h('div', { className: 'dsh-sp__historyText' }, toPlainExcerpt(entry.text).trim() || t('note.untitled'))))));
 
       const editorBody = historyOpen && editor.id ? historyBody : previewMode
         ? h('div', {
@@ -3422,10 +3475,14 @@ window.__ModuleLoader__.load({
           onBlur: () => { void flush(); },
         });
 
-      const composerCard = h('section', {
-        className: 'dsh-sp__editor',
-        'data-drag': dragging ? 'true' : 'false',
-      },
+      // History mode owns the whole card: toolbar, tags and status rows step
+      // aside so the version list gets the full height.
+      const composerCard = historyOpen && editor.id
+        ? h('section', { className: 'dsh-sp__editor' }, historyBody)
+        : h('section', {
+          className: 'dsh-sp__editor',
+          'data-drag': dragging ? 'true' : 'false',
+        },
         toolsBar,
         editorBody,
         editor.attachments.length > 0 ? h('div', { className: 'dsh-sp__tiles' },
