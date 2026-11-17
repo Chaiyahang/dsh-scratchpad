@@ -52,6 +52,7 @@ window.__ModuleLoader__.load({
         'panel.undo': 'Undo',
         'panel.updatedElsewhere': 'This note was just updated in another window or by the Agent.',
         'panel.localData': 'Notes stored locally in ~/.dsh/scratchpad/.',
+        'panel.dictation': 'Voice input (hold Fn / system dictation)',
         'trash.title': 'Trash',
         'trash.back': 'Back to notes',
         'trash.empty': 'Trash is empty.',
@@ -174,6 +175,7 @@ window.__ModuleLoader__.load({
         'panel.undo': '撤销',
         'panel.updatedElsewhere': '此便签刚被其他窗口或 Agent 更新。',
         'panel.localData': '数据在本机 ~/.dsh/scratchpad/。',
+        'panel.dictation': '语音说话（按住 Fn / 系统听写）',
         'trash.title': '回收站',
         'trash.back': '返回便签',
         'trash.empty': '回收站是空的。',
@@ -3565,6 +3567,8 @@ window.__ModuleLoader__.load({
           h('kbd', { className: 'dsh-sp__kbd' }, searchKbd || '⌘⇧F'), h('span', null, t('shortcut.searchShort'))),
         h('div', { className: 'dsh-sp__aboutRow' },
           h('kbd', { className: 'dsh-sp__kbd' }, isMacPlatform() ? '⌘↵' : 'Ctrl+↵'), h('span', null, t('editor.jot'))),
+        h('div', { className: 'dsh-sp__aboutRow' },
+          h('kbd', { className: 'dsh-sp__kbd' }, isMacPlatform() ? 'Fn' : 'Win H'), h('span', null, t('panel.dictation'))),
         h('div', { className: 'dsh-sp__aboutNote' }, t('panel.localData')));
 
       const feedChildren = [
