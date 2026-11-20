@@ -27,21 +27,23 @@
 
 ## 安装
 
-把 `PROFILE` 换成你的 profile 名（例如 `desktop`）。从 npm：
+从 npm（**web** / **desktop** 是常见 profile 名，按需替换）：
 
 ```bash
-dsh plugin --profile PROFILE add @chaiyahang/dsh-scratchpad@latest
+dsh plugin --profile web add @chaiyahang/dsh-scratchpad@latest
+dsh plugin --profile desktop add @chaiyahang/dsh-scratchpad@latest
 ```
 
 从 GitHub（跟随默认分支）：
 
 ```bash
-dsh plugin --profile PROFILE add github:Chaiyahang/dsh-scratchpad
+dsh plugin --profile web add github:Chaiyahang/dsh-scratchpad
+dsh plugin --profile desktop add github:Chaiyahang/dsh-scratchpad
 ```
 
 或让插件管理器安装本地目录：`plugin_manager install_bundle /路径/到/dsh-scratchpad`。装完刷新页面。
 
-> 从本地 `link:` 安装切换到 npm 时，`pnpm add <包名>` 会保留原来的 link；请用上面的 `@latest`，或先 `dsh plugin --profile PROFILE remove @chaiyahang/dsh-scratchpad` 再安装。
+> 从本地 `link:` 安装切换到 npm 时，`pnpm add <包名>` 会保留原来的 link；请用上面的 `@latest`，或先 `dsh plugin --profile web remove @chaiyahang/dsh-scratchpad`（或 `desktop`）再安装。
 
 ## 使用
 
