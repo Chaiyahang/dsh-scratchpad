@@ -304,7 +304,11 @@ window.__ModuleLoader__.load({
     .dsh-sp__composerFold:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
     .dsh-sp__showMore{flex:none;border:1px dashed var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:10px;padding:9px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
     .dsh-sp__showMore:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
-    @media (max-width:900px){.dsh-sp__cols{flex-direction:column}.dsh-sp__composerCol{flex:none;width:auto}}
+    .dsh-sp[data-narrow="true"] .dsh-sp__cols{flex-direction:column}
+    .dsh-sp[data-narrow="true"] .dsh-sp__composerCol{flex:none;width:auto}
+    .dsh-sp[data-narrow="true"] .dsh-sp__subtitle{display:none}
+    .dsh-sp[data-narrow="true"] .dsh-sp__about{display:none}
+    .dsh-sp[data-compact="true"] .dsh-sp__composerCol{flex-basis:320px}
     .dsh-sp__inner{display:flex;flex-direction:column;gap:14px;width:100%;max-width:1100px;min-height:0;height:100%;padding:20px 24px 0;box-sizing:border-box}
 .dsh-sp__header{flex:none;display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
 .dsh-sp__titles{flex:1 1 160px;min-width:0}
@@ -361,7 +365,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__tagRemove:hover{color:var(--dsw-alias-state-error-primary)}
 .dsh-sp__tagInput{flex:1;min-width:110px;border:none;background:transparent;color:var(--dsw-alias-label-primary);font-family:inherit;font-size:12px;line-height:1.6;outline:none;padding:2px 0}
 .dsh-sp__tagInput::placeholder{color:var(--dsw-alias-label-secondary);opacity:.85}
-.dsh-sp__filters{flex:none;display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;padding:2px 0}
+.dsh-sp__filters{flex:none;display:flex;gap:6px;flex-wrap:wrap;padding:2px 0}
 .dsh-sp__filter{flex:none;border:1px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:999px;padding:2px 9px;font-size:11.5px;font-family:inherit;line-height:1.6;cursor:pointer;white-space:nowrap}
 .dsh-sp__filter:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .dsh-sp__filter[data-active="true"]{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
@@ -395,7 +399,9 @@ window.__ModuleLoader__.load({
 .dsh-sp__conflict{flex:none;display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-state-warn-primary)}
 .dsh-sp__trash{flex:none;display:flex;align-items:center;gap:2px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
 .dsh-sp__list{display:flex;flex-direction:column;gap:10px}
-    .dsh-sp__listHeader{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding-top:2px}
+    .dsh-sp__listHeader{display:flex;align-items:baseline;justify-content:flex-start;gap:8px;row-gap:6px;flex-wrap:wrap;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary);padding-top:2px}
+    .dsh-sp__listHeader span{white-space:nowrap}
+    .dsh-sp__headerActions{margin-left:auto;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;justify-content:flex-end}
     .dsh-sp__toolbar{background:var(--dsw-alias-bg-layer-2);border:1px solid var(--dsw-alias-border-l1);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:8px}
     .dsh-sp__about{background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;padding:8px 12px;display:flex;flex-direction:row;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:11.5px;color:var(--dsw-alias-label-secondary)}
     .dsh-sp__aboutRow{display:flex;align-items:center;gap:8px}
@@ -2219,8 +2225,10 @@ window.__ModuleLoader__.load({
       const [trashed, setTrashed] = useState([]);
       /** Archived notes (done but kept), refreshed alongside the live list. */
       const [archived, setArchived] = useState([]);
-      /** Narrow windows fold the composer into a one-line entry. */
+      /** Narrow panels fold the composer into a one-line entry. */
       const [narrow, setNarrow] = useState(false);
+      /** Mid-width panels (721–1100px) run dual columns with a slimmer composer. */
+      const [compact, setCompact] = useState(false);
       const [composerOpen, setComposerOpen] = useState(true);
       const [query, setQuery] = useState('');
       const [confirmId, setConfirmId] = useState(null);
@@ -2265,6 +2273,8 @@ window.__ModuleLoader__.load({
       const imageInputRef = useRef(null);
       const fileInputRef = useRef(null);
       const importInputRef = useRef(null);
+      /** The panel root, observed for width so breakpoints track the panel itself. */
+      const panelRef = useRef(null);
       const draftTimerRef = useRef(0);
 
       const updateEditor = useCallback((next) => {
@@ -2694,21 +2704,31 @@ window.__ModuleLoader__.load({
         return off;
       }, [focusSearchInput]);
 
-      // Narrow windows fold the composer; it reopens for new notes and edits.
+      // Panel-adaptive layout: the DSH sidebar eats into the window, so the
+      // breakpoints track the PANEL's own width (ResizeObserver), not the
+      // window's — narrow ≤720px folds the composer, 721–1100px slims it.
       useEffect(() => {
-        const query = window.matchMedia('(max-width: 900px)');
+        const element = panelRef.current;
+        if (!element || typeof ResizeObserver !== 'function') return undefined;
         const apply = () => {
-          setNarrow(query.matches);
-          if (query.matches) {
-            const current = editorRef.current;
-            if (current.text.trim() === '' && current.tags.length === 0 && current.attachments.length === 0) setComposerOpen(false);
-          } else {
-            setComposerOpen(true);
-          }
+          const width = element.clientWidth;
+          const isNarrow = width <= 720;
+          setCompact(!isNarrow && width <= 1100);
+          setNarrow((previous) => {
+            if (isNarrow === previous) return previous;
+            if (isNarrow) {
+              const current = editorRef.current;
+              if (current.text.trim() === '' && current.tags.length === 0 && current.attachments.length === 0) setComposerOpen(false);
+            } else {
+              setComposerOpen(true);
+            }
+            return isNarrow;
+          });
         };
         apply();
-        query.addEventListener('change', apply);
-        return () => query.removeEventListener('change', apply);
+        const observer = new ResizeObserver(apply);
+        observer.observe(element);
+        return () => observer.disconnect();
       }, []);
 
       const openNote = useCallback(async (note) => {
@@ -3719,6 +3739,13 @@ window.__ModuleLoader__.load({
         : h('section', {
           className: 'dsh-sp__editor',
           'data-drag': dragging ? 'true' : 'false',
+          onDoubleClick: () => {
+            // Narrow panels: a double-click on an empty card re-folds the composer.
+            if (!narrow) return;
+            const current = editorRef.current;
+            if (current.text.trim() !== '' || current.attachments.length > 0 || current.tags.length > 0) return;
+            setComposerOpen(false);
+          },
         },
         toolsBar,
         editorBody,
@@ -3820,7 +3847,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'dsh-sp__listHeader' },
             h('span', null, trashView ? t('trash.title') : todoView ? t('todos.title') : archiveView ? t('archive.title') : t('panel.listTitle')),
             h('span', null, String(trashView ? trashed.length : todoView ? openTaskCount : archiveView ? archiveFiltered.length : visibleNotes.length)),
-            h('span', { className: 'dsh-sp__barSpacer' }),
+            h('span', { className: 'dsh-sp__headerActions' },
             listView === 'notes' ? h('button', {
               type: 'button',
               className: 'dsh-sp__textBtn dsh-sp__chipBtn',
@@ -3879,7 +3906,7 @@ window.__ModuleLoader__.load({
               type: 'button',
               className: 'dsh-sp__textBtn dsh-sp__chipBtn',
               onClick: () => setListView('notes'),
-            }, t('trash.back')) : null));
+            }, t('trash.back')) : null)));
         feedChildren.push(toolbar);
         if (selectMode) {
           const everyVisible = visibleNotes.length > 0 && visibleNotes.every((note) => selectedIds.has(note.id));
@@ -4081,7 +4108,7 @@ window.__ModuleLoader__.load({
         feedChildren.push(h('div', { className: 'dsh-sp__listScroll' }, listArea));
       }
 
-      return h('div', { className: 'dsh-sp', onDrop, onDragOver, onDragLeave },
+      return h('div', { className: 'dsh-sp', ref: panelRef, 'data-narrow': narrow ? 'true' : 'false', 'data-compact': compact ? 'true' : 'false', onDrop, onDragOver, onDragLeave },
         h('div', { className: 'dsh-sp__inner' },
           h('header', { className: 'dsh-sp__header' },
             h('div', { className: 'dsh-sp__titles' },
