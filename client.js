@@ -317,7 +317,7 @@ window.__ModuleLoader__.load({
 .dsh-sp__kbd{flex:none;border:1px solid var(--dsw-alias-border-l1);border-radius:5px;padding:1px 5px;font-size:10.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);font-family:inherit;white-space:nowrap}
 .dsh-sp__version{flex:none;font-size:11px;line-height:1.5;color:var(--dsw-alias-label-secondary);opacity:.8;font-family:inherit;white-space:nowrap}
 .dsh-sp__subtitle{margin:3px 0 0;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary)}
-.dsh-sp__search{flex:0 1 260px;min-width:140px;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;line-height:1.4;outline:none;transition:border-color .12s ease}
+.dsh-sp__search{flex:0 1 260px;min-width:140px;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);border-radius:8px;padding:7px 10px 7px 32px;font-size:13px;font-family:inherit;line-height:1.4;outline:none;transition:border-color .12s ease}
 .dsh-sp__search::placeholder{color:var(--dsw-alias-label-secondary);opacity:.85}
 .dsh-sp__search:focus{border-color:var(--dsw-alias-brand-primary)}
 .dsh-sp__new{flex:none;display:inline-flex;align-items:center;gap:6px;border:none;border-radius:8px;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);padding:7px 11px;font-size:12.5px;font-weight:600;font-family:inherit;line-height:1.4;cursor:pointer}
@@ -326,6 +326,7 @@ window.__ModuleLoader__.load({
     .dsh-sp__jotKbd{opacity:.6;margin-left:5px;font-weight:500}
 .dsh-sp__searchGroup{flex:1 1 240px;max-width:300px;min-width:170px;display:flex;align-items:center;gap:6px}
 .dsh-sp__searchWrap{position:relative;flex:1 1 auto;min-width:0}
+.dsh-sp__searchIcon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--dsw-alias-label-secondary);pointer-events:none;display:flex}
 .dsh-sp__searchWrap .dsh-sp__search{width:100%}
 .dsh-sp__search--kbd{padding-right:58px}
 .dsh-sp__kbdIn{position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none}
@@ -4119,6 +4120,7 @@ window.__ModuleLoader__.load({
               h('p', { className: 'dsh-sp__subtitle' }, t('panel.subtitle'))),
             h('div', { className: 'dsh-sp__searchGroup' },
               h('div', { className: 'dsh-sp__searchWrap' },
+                h('span', { className: 'dsh-sp__searchIcon' }, h(SearchIcon, { size: 13 })),
                 h('input', {
                   ref: searchInputRef,
                   type: 'search',
@@ -4135,7 +4137,7 @@ window.__ModuleLoader__.load({
               className: 'dsh-sp__new',
               title: t('shortcut.new'),
               onClick: () => { void startDraft(); },
-            }, h(PlusIcon, null), t('panel.new'), h('span', { className: 'dsh-sp__jotKbd' }, newKbd || '⌘⇧N'))),
+            }, h(PlusIcon, null), t('panel.new'))),
           h('div', { className: 'dsh-sp__cols' },
             listView === 'notes' ? h('div', { className: 'dsh-sp__composerCol' },
               narrow && !composerOpen
