@@ -3460,18 +3460,19 @@ window.__ModuleLoader__.load({
         return () => window.clearTimeout(timer);
       }, [cursorIndex, ready]);
 
-      // The import confirmation is modal: Esc dismisses it. Esc also leaves
-      // the history view.
+      // Esc dismisses the import modal, leaves the history view, and returns
+      // from archive/todos/trash to the main notes list.
       useEffect(() => {
-        if (!importPreview && !historyOpen) return undefined;
+        if (!importPreview && !historyOpen && listView === 'notes') return undefined;
         const onKeyDown = (event) => {
           if (event.key !== 'Escape') return;
           if (importPreview) setImportPreview(null);
           else if (historyOpen) setHistoryOpen(false);
+          else if (listView !== 'notes') setListView('notes');
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-      }, [importPreview, historyOpen]);
+      }, [importPreview, historyOpen, listView]);
 
       // ↑/↓ walk the feed, ↵ opens, Esc dismisses. Typing surfaces keep their
       // keys; the search box hands off with ↓/↑ without leaving the box.
