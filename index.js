@@ -275,6 +275,7 @@ export function apply(ctx) {
   async function handleList(request) {
     const url = new URL(request.url);
     const trash = url.searchParams.get('view') === 'trash';
+    const archive = url.searchParams.get('view') === 'archive';
     const includeTrash = url.searchParams.get('include') === 'trash';
     const state = await readState();
     // Conditional poll: when the client already holds this revision, skip the
@@ -283,24 +284,27 @@ export function apply(ctx) {
     if (Number.isInteger(since) && since === state.revision) {
       return json({ ok: true, revision: state.revision, unchanged: true, notes: [] });
     }
-    const live = state.notes.filter((note) => !note.deletedAt);
+    const live = state.notes.filter((note) => !note.deletedAt && !note.archivedAt);
+    const archived = state.notes.filter((note) => !note.deletedAt && note.archivedAt);
+    const trashed = state.notes.filter((note) => note.deletedAt);
     // The client hides the history button for notes without recorded versions,
     // so each live note carries its count (history is in memory — free here).
     const hist = await loadHistory();
     const withCount = (note) => ({ ...note, historyCount: hist.entries[note.id]?.length ?? 0 });
-    if (includeTrash && !trash) {
-      // Combined poll: both lists in one response; one revision covers both.
+    if (includeTrash && !trash && !archive) {
+      // Combined poll: all three lists in one response; one revision covers all.
       return json({
         ok: true,
         revision: state.revision,
         notes: live.map(withCount),
-        trashed: state.notes.filter((note) => note.deletedAt),
+        archived: archived.map(withCount),
+        trashed,
       });
     }
     return json({
       ok: true,
       revision: state.revision,
-      notes: trash ? state.notes.filter((note) => note.deletedAt) : live.map(withCount),
+      notes: trash ? trashed : archive ? archived.map(withCount) : live.map(withCount),
     });
   }
 
@@ -515,6 +519,38 @@ export function apply(ctx) {
       : [];
     if (ids.length === 0) throw badRequest('missing export ids');
     return handleExport(request, new Set(ids));
+  }
+
+  /** Text exit-ramp: every live note as one Markdown file (no attachments). */
+  async function handleExportMarkdown(request) {
+    const body = await readBody(request);
+    const ids = Array.isArray(body?.ids)
+      ? body.ids.filter((id) => typeof id === 'string' && /^[A-Za-z0-9-]{1,80}$/.test(id))
+      : [];
+    const idFilter = ids.length > 0 ? new Set(ids) : null;
+    const state = await readState();
+    const notes = state.notes
+      .filter((note) => !note.deletedAt && !note.archivedAt)
+      .filter((note) => !idFilter || idFilter.has(note.id))
+      .sort((left, right) => left.updatedAt - right.updatedAt);
+    const parts = ['# Scratchpad', '', '> ' + new Date().toISOString().slice(0, 19).replace('T', ' ') + ' · ' + notes.length + ' notes', ''];
+    for (const note of notes) {
+      const when = new Date(note.updatedAt);
+      const pad = (value) => String(value).padStart(2, '0');
+      const stamp = when.getFullYear() + '-' + pad(when.getMonth() + 1) + '-' + pad(when.getDate()) + ' ' + pad(when.getHours()) + ':' + pad(when.getMinutes());
+      parts.push('## ' + stamp, '');
+      if (note.tags.length > 0) parts.push('> ' + note.tags.map((tag) => '#' + tag).join(' '), '');
+      parts.push(note.text.trim() === '' ? '(empty)' : note.text, '', '---', '');
+    }
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+    return new Response(parts.join('\n'), {
+      status: 200,
+      headers: {
+        'content-type': 'text/markdown; charset=utf-8',
+        'content-disposition': `attachment; filename="scratchpad-${stamp}.md"`,
+        'cache-control': 'no-store',
+      },
+    });
   }
 
   /**
@@ -832,7 +868,7 @@ export function apply(ctx) {
 
   function toolSummary(note) {
     const tags = note.tags.length > 0 ? note.tags.map((tag) => `#${tag}`).join(' ') : null;
-    const bits = [`[${note.id}]`, note.pinned ? 'pinned' : null, tags, previewOf(note), `(${note.attachments.length} attachment${note.attachments.length === 1 ? '' : 's'}, updated ${new Date(note.updatedAt).toISOString()})`];
+    const bits = [`[${note.id}]`, note.archivedAt ? 'archived' : null, note.pinned ? 'pinned' : null, tags, previewOf(note), `(${note.attachments.length} attachment${note.attachments.length === 1 ? '' : 's'}, updated ${new Date(note.updatedAt).toISOString()})`];
     return bits.filter(Boolean).join(' ');
   }
 
@@ -861,6 +897,7 @@ export function apply(ctx) {
         const tag = typeof args?.tag === 'string' ? args.tag.trim().toLowerCase() : '';
         const limit = Math.min(Math.max(Number.isInteger(args?.limit) ? args.limit : DEFAULT_LIST_LIMIT, 1), MAX_LIST_LIMIT);
         const matching = state.notes
+          .filter((note) => !note.deletedAt)
           .filter((note) => tag === '' || note.tags.some((item) => item.toLowerCase() === tag))
           .filter((note) => query === ''
             || note.text.toLowerCase().includes(query)
@@ -905,7 +942,7 @@ export function apply(ctx) {
         const shown = Math.min(matching.length, limit);
         const lines = [matching.length + ' note' + (matching.length === 1 ? '' : 's') + ' matched (' + shown + ' shown):'];
         for (const note of matching.slice(0, limit)) {
-          const bits = ['[' + note.id + ']', note.pinned ? 'pinned' : null];
+          const bits = ['[' + note.id + ']', note.archivedAt ? 'archived' : null, note.pinned ? 'pinned' : null];
           if (note.tags.length > 0) bits.push(note.tags.map((item) => '#' + item).join(' '));
           bits.push('(' + note.attachments.length + ' attachment' + (note.attachments.length === 1 ? '' : 's') + ', updated ' + new Date(note.updatedAt).toISOString() + ')');
           lines.push('- ' + bits.filter(Boolean).join(' '));
@@ -1112,6 +1149,7 @@ export function apply(ctx) {
         { path: `${API}/files`, handlers: { GET: handleFile, POST: handleUpload } },
         { path: `${API}/files/delete`, handlers: { POST: handleDeleteFile } },
         { path: `${API}/export`, handlers: { GET: handleExport, POST: handleExportPost } },
+        { path: `${API}/export-md`, handlers: { POST: handleExportMarkdown } },
         { path: `${API}/import`, handlers: { POST: handleImport } },
       ].map(({ path, handlers }) => ({
         path,
@@ -1292,6 +1330,7 @@ function readNote(input) {
     createdAt: toTime(input.createdAt),
     updatedAt: toTime(input.updatedAt),
     deletedAt: Number.isFinite(input.deletedAt) && input.deletedAt > 0 ? Math.round(input.deletedAt) : 0,
+    archivedAt: Number.isFinite(input.archivedAt) && input.archivedAt > 0 ? Math.round(input.archivedAt) : 0,
     attachments,
     source: input.source === 'agent' ? 'agent' : null,
   };

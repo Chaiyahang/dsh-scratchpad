@@ -12,8 +12,8 @@ const slice = (startMarker, endMarker) => {
 const createElement = (type, props, ...children) => ({ type, props: props ?? {}, children });
 const build = new Function('h', `${slice('function highlightNodes', 'function toPlainExcerpt')}; return { renderInline, renderMarkdown, wrapMarkdown, toggleLinePrefix, htmlToMarkdown };`);
 const { renderInline, renderMarkdown, wrapMarkdown, toggleLinePrefix, htmlToMarkdown } = build(createElement);
-const keyboard = new Function(`${slice('function toPlainExcerpt', '// ---------------------------------------------------------------------\n    // Focus requests')}; return { toPlainExcerpt, cursorStep, isEditableTarget };`)();
-const { toPlainExcerpt: excerpt, cursorStep, isEditableTarget } = keyboard;
+const keyboard = new Function(`${slice('function toPlainExcerpt', '// ---------------------------------------------------------------------\n    // Focus requests')}; return { toPlainExcerpt, cursorStep, isEditableTarget, parseQuery };`)();
+const { toPlainExcerpt: excerpt, cursorStep, isEditableTarget, parseQuery } = keyboard;
 
 function assert(condition, message) {
   if (!condition) throw new Error(`assertion failed: ${message}`);
@@ -45,8 +45,12 @@ blocks[0].children[0].props.onChange();
 assert(toggled.length === 1 && toggled[0] === 0, 'toggle reports the raw source line index');
 assert(marks.includes('h2') && marks.includes('strong') && marks.includes('code'), 'heading, bold and inline code render');
 
-blocks = renderMarkdown('```js\nconst a = 1;\n```\n\nafter', () => {}, 'Task');
-assert(blocks[0].type === 'pre' && blocks[0].children[0].children[0] === 'const a = 1;', 'fenced code block keeps its body');
+blocks = renderMarkdown('```js\nconst a = 1;\n```\n\nafter', () => {}, 'Task', 'Copy');
+assert(blocks[0].type === 'div' && blocks[0].props.className === 'dsh-sp__mdPreWrap', 'fenced code renders inside a copy wrapper');
+const pre = blocks[0].children.find((child) => child.type === 'pre');
+assert(pre.children[0].children[0] === 'const a = 1;', 'fenced code block keeps its body');
+const copyBtn = blocks[0].children.find((child) => child.type === 'button');
+assert(copyBtn && copyBtn.children[0] === 'Copy', 'the code block carries a copy button');
 assert(blocks[1].type === 'p' && flatten([blocks[1]]).includes('after'), 'paragraph after the fence');
 
 blocks = renderMarkdown('1. one\n2. two\n\n> quote\n\nplain line one\nplain line two', () => {}, 'Task');
@@ -153,5 +157,12 @@ assert(isEditableTarget({ tagName: 'TEXTAREA' }) && isEditableTarget({ tagName: 
   && isEditableTarget({ tagName: 'DIV', isContentEditable: true }) && !isEditableTarget({ tagName: 'DIV' })
   && !isEditableTarget(null),
   'editable targets are detected so their keys are never hijacked');
+
+const parsed = parseQuery('买牛奶 after:7d');
+assert(parsed.needle === '买牛奶' && parsed.after > 0 && parsed.before === 0, 'after tokens split from the needle');
+const parsedAbs = parseQuery('报销 before:2026-12-01 after:2026-11-01');
+assert(parsedAbs.needle === '报销' && parsedAbs.after > 0 && parsedAbs.before > parsedAbs.after, 'absolute date tokens parse');
+const plainQ = parseQuery('just words here');
+assert(plainQ.needle === 'just words here' && plainQ.after === 0 && plainQ.before === 0, 'queries without tokens pass through');
 
 console.log('markdown test passed');
