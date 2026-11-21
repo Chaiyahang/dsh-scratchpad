@@ -11,7 +11,10 @@ const body = source.slice(start, end);
 
 // PanelPage's useState declaration order, derived from the source itself so
 // the state-driven scenarios below survive reorders of the declarations.
-const stateNames = [...body.matchAll(/const \[(\w+), set\w+\] = useState\(/g)].map((match) => match[1]);
+// Only the PanelPage region is scanned — earlier components (AttachmentTile)
+// have their own useStates that must not shift the mapping.
+const panelSource = body.slice(body.indexOf('function PanelPage('));
+const stateNames = [...panelSource.matchAll(/const \[(\w+), set\w+\] = useState\(/g)].map((match) => match[1]);
 
 const createElement = (type, props, ...children) => ({ type, props: props ?? {}, children });
 

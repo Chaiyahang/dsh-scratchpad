@@ -168,7 +168,14 @@ export function apply(ctx) {
         && parsed.entries !== null && typeof parsed.entries === 'object' && !Array.isArray(parsed.entries)
         ? parsed
         : { version: 1, entries: {} };
-    } catch {
+    } catch (error) {
+      // Same self-heal as notes.json: ENOENT is a first run, anything else
+      // keeps the corrupt bytes for manual recovery and starts empty.
+      const missing = error && error.code === 'ENOENT';
+      if (!missing) {
+        await archiveCorruptStore(historyFile);
+        ctx.logger?.warn?.('scratchpad: history.json was unreadable; archived it and started an empty history');
+      }
       historyCache = { version: 1, entries: {} };
     }
     return historyCache;
@@ -917,7 +924,17 @@ export function apply(ctx) {
           .slice(0, limit);
         if (matching.length === 0) return state.notes.length === 0 ? 'The scratchpad is empty.' : 'No scratchpad note matches that query.';
         const header = `${state.notes.length} note${state.notes.length === 1 ? '' : 's'} in the scratchpad (showing ${matching.length}):`;
-        return [header, ...matching.map((note) => `- ${toolSummary(note)}`)].join('\n');
+        const lines = [header, ...matching.map((note) => `- ${toolSummary(note)}`)];
+        const census = new Map();
+        for (const note of state.notes) {
+          if (note.deletedAt) continue;
+          for (const tag of note.tags) census.set(tag, (census.get(tag) || 0) + 1);
+        }
+        if (census.size > 0) {
+          const listing = [...census.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])).map(([tag, count]) => '#' + tag + '(' + count + ')').join(' ');
+          lines.push('', 'Tag census (use these exact tags when tagging): ' + listing);
+        }
+        return lines.join('\n');
       },
     },
     {

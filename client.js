@@ -111,6 +111,7 @@ window.__ModuleLoader__.load({
         'editor.table': 'Table',
         'editor.mdGroup': 'Markdown formatting',
         'editor.remove': 'Remove attachment',
+        'editor.rename': 'Rename',
         'note.pin': 'Pin note',
         'note.unpin': 'Unpin note',
         'note.delete': 'Delete note',
@@ -249,6 +250,7 @@ window.__ModuleLoader__.load({
         'editor.table': '表格',
         'editor.mdGroup': 'Markdown 格式',
         'editor.remove': '移除附件',
+        'editor.rename': '重命名',
         'note.pin': '置顶',
         'note.unpin': '取消置顶',
         'note.delete': '删除便签',
@@ -398,6 +400,11 @@ window.__ModuleLoader__.load({
 .dsh-sp__tileImg{width:100%;height:100%;object-fit:cover;display:block}
 .dsh-sp__tileExt{font-size:10px;font-weight:700;letter-spacing:.04em;line-height:1}
 .dsh-sp__tileRemove{position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:50%;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
+.dsh-sp__tileRename{position:absolute;top:2px;left:2px;width:18px;height:18px;border:none;border-radius:50%;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;opacity:0;transition:opacity .12s ease}
+.dsh-sp__tile:hover .dsh-sp__tileRename,.dsh-sp__tile:focus-within .dsh-sp__tileRename{opacity:1}
+.dsh-sp__tile[data-renaming="true"]{width:160px}
+.dsh-sp__tileRenameInput{width:100%;border:none;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:11px;padding:0 4px;outline:1px solid var(--dsw-alias-brand-primary)}
+.dsh-sp__tileName{position:absolute;left:3px;right:3px;bottom:3px;font-size:9px;line-height:1.3;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-overlay);border-radius:4px;padding:0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;pointer-events:none}
 .dsh-sp__tileRemove:hover{color:var(--dsw-alias-state-error-primary)}
     .dsh-sp__bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:26px}
 .dsh-sp__iconBtn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-secondary);border-radius:7px;padding:4px 8px;font-size:12px;font-family:inherit;line-height:1.4;cursor:pointer}
@@ -1877,7 +1884,14 @@ window.__ModuleLoader__.load({
     // Attachments
     // ---------------------------------------------------------------------
 
-    function AttachmentTile({ attachment, confirming, onRemove, onOpen, t }) {
+    function AttachmentTile({ attachment, confirming, onRemove, onRename, onOpen, t }) {
+      const [renaming, setRenaming] = useState(false);
+      const [draft, setDraft] = useState(attachment.name);
+      const commitRename = () => {
+        setRenaming(false);
+        const next = draft.trim();
+        if (next !== '' && next !== attachment.name) onRename(attachment, next);
+      };
       const label = attachment.kind === 'image' ? attachment.name : `${attachment.name} (${formatSize(attachment.size)})`;
       const body = attachment.kind === 'image'
         ? h('button', {
@@ -1899,8 +1913,35 @@ window.__ModuleLoader__.load({
             download: attachment.name,
             title: label,
           }, h('span', { className: 'dsh-sp__tileExt' }, extensionOf(attachment.name)));
+      if (renaming) {
+        return h('div', { className: 'dsh-sp__tile', 'data-renaming': 'true' },
+          h('input', {
+            className: 'dsh-sp__tileRenameInput',
+            value: draft,
+            autoFocus: true,
+            'aria-label': t('editor.rename'),
+            onChange: (event) => setDraft(event.target.value),
+            onClick: (event) => event.stopPropagation(),
+            onKeyDown: (event) => {
+              if (event.key === 'Enter') commitRename();
+              if (event.key === 'Escape') setRenaming(false);
+            },
+            onBlur: commitRename,
+          }));
+      }
       return h('div', { className: 'dsh-sp__tile', 'data-confirm': confirming ? 'true' : 'false' },
         body,
+        h('button', {
+          type: 'button',
+          className: 'dsh-sp__tileRename',
+          'aria-label': t('editor.rename'),
+          title: t('editor.rename'),
+          onClick: (event) => {
+            event.stopPropagation();
+            setDraft(attachment.name);
+            setRenaming(true);
+          },
+        }, '✎'),
         h('button', {
           type: 'button',
           className: 'dsh-sp__tileRemove',
@@ -1908,7 +1949,8 @@ window.__ModuleLoader__.load({
           'aria-label': confirming ? t('note.confirmDelete') : t('editor.remove'),
           title: confirming ? t('note.confirmDelete') : t('editor.remove'),
           onClick: () => onRemove(attachment),
-        }, confirming ? '!' : '×'));
+        }, confirming ? '!' : '×'),
+        h('span', { className: 'dsh-sp__tileName', title: label }, attachment.name));
     }
 
     function NoteThumb({ attachment, onOpen }) {
@@ -2725,6 +2767,17 @@ window.__ModuleLoader__.load({
         queueDraft(next);
         if (next.id) scheduleSave(next);
         void deleteRemoteFile(attachment);
+      }, [queueDraft, scheduleSave, updateEditor]);
+
+      /** Rename an attachment's display name (the file on disk keeps its name). */
+      const renameAttachment = useCallback((attachment, newName) => {
+        const current = editorRef.current;
+        if (!current.attachments.some((item) => item.id === attachment.id)) return;
+        const next = { ...current, attachments: current.attachments.map((item) => (item.id === attachment.id ? { ...item, name: newName } : item)), updatedAt: Date.now() };
+        dirtyRef.current = true;
+        updateEditor(next);
+        queueDraft(next);
+        if (next.id) scheduleSave(next);
       }, [queueDraft, scheduleSave, updateEditor]);
 
       /** Attachment tiles delete files for good — two clicks, 3s timeout. */
@@ -3966,6 +4019,7 @@ window.__ModuleLoader__.load({
             confirming: confirmRemoveId === attachment.id,
             t,
             onRemove: handleRemoveClick,
+            onRename: renameAttachment,
             onOpen: (item) => openPreview(item, editor.attachments),
           }))) : null,
         h('div', { className: 'dsh-sp__tags' },
