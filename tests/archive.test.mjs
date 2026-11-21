@@ -63,6 +63,17 @@ try {
   const mdPicked = await harness.request('POST', '/api/scratchpad/export-md', { json: { ids: [agentNote.id] } });
   const pickedText = mdPicked.buffer.toString('utf8');
   assert(pickedText.includes('agent note') && !pickedText.includes('active draft'), 'md export honors an ids filter');
+
+  // Archive section: archived notes ride along under their own heading.
+  await harness.request('POST', NOTES, { json: { note: { ...agentNote, archivedAt: 101 } } });
+  const withArchive = await harness.request('POST', '/api/scratchpad/export-md', { json: {} });
+  const archiveText = withArchive.buffer.toString('utf8');
+  assert(archiveText.includes('# 归档'), 'md export carries an archive section');
+  assert(archiveText.includes('agent note'), 'the archived agent note rides along in the export');
+  const archivePart = archiveText.slice(archiveText.indexOf('# 归档'));
+  assert(archivePart.includes('to delete') === false, 'trashed notes stay out of the archive section');
+
+  const archivedMd = await harness.request('POST', '/api/scratchpad/export-md', { json: { ids: ['missing-id'] } });
   const mdNone = await harness.request('POST', '/api/scratchpad/export-md', { json: { ids: ['missing-id'] } });
   assert(!mdNone.buffer.toString('utf8').includes('## '), 'md export with no matching ids yields an empty document');
 

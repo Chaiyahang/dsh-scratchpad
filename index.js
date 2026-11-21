@@ -529,18 +529,28 @@ export function apply(ctx) {
       : [];
     const idFilter = ids.length > 0 ? new Set(ids) : null;
     const state = await readState();
-    const notes = state.notes
+    const live = state.notes
       .filter((note) => !note.deletedAt && !note.archivedAt)
       .filter((note) => !idFilter || idFilter.has(note.id))
       .sort((left, right) => left.updatedAt - right.updatedAt);
-    const parts = ['# Scratchpad', '', '> ' + new Date().toISOString().slice(0, 19).replace('T', ' ') + ' · ' + notes.length + ' notes', ''];
-    for (const note of notes) {
-      const when = new Date(note.updatedAt);
+    const archived = state.notes
+      .filter((note) => !note.deletedAt && note.archivedAt)
+      .filter((note) => !idFilter || idFilter.has(note.id))
+      .sort((left, right) => left.archivedAt - right.archivedAt);
+    const parts = ['# Scratchpad', '', '> ' + new Date().toISOString().slice(0, 19).replace('T', ' ') + ' · ' + (live.length + archived.length) + ' notes', ''];
+    const renderNote = (note) => {
+      const when = note.archivedAt || note.updatedAt;
+      const d = new Date(when);
       const pad = (value) => String(value).padStart(2, '0');
-      const stamp = when.getFullYear() + '-' + pad(when.getMonth() + 1) + '-' + pad(when.getDate()) + ' ' + pad(when.getHours()) + ':' + pad(when.getMinutes());
+      const stamp = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
       parts.push('## ' + stamp, '');
       if (note.tags.length > 0) parts.push('> ' + note.tags.map((tag) => '#' + tag).join(' '), '');
       parts.push(note.text.trim() === '' ? '(empty)' : note.text, '', '---', '');
+    };
+    for (const note of live) renderNote(note);
+    if (archived.length > 0) {
+      parts.push('# ' + '归档', '');
+      for (const note of archived) renderNote(note);
     }
     const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
     return new Response(parts.join('\n'), {

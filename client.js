@@ -44,6 +44,7 @@ window.__ModuleLoader__.load({
         'panel.noResults': 'No note matches your search.',
         'panel.showMore': 'Show more',
         'panel.clearSearch': 'Clear search',
+        'panel.archiveMatches': 'Found in archive — view',
         'panel.restored': 'Note restored.',
         'panel.dismissToast': 'Dismiss',
         'panel.loadError': 'Could not read the note store. Check that the plugin host side is running.',
@@ -181,6 +182,7 @@ window.__ModuleLoader__.load({
         'panel.noResults': '没有匹配的便签。',
         'panel.showMore': '显示更多',
         'panel.clearSearch': '清除搜索',
+        'panel.archiveMatches': '归档中有匹配 — 查看',
         'panel.restored': '已恢复到便签列表。',
         'panel.dismissToast': '点击关闭',
         'panel.loadError': '无法读取便签存储，请确认插件 Host 端已加载。',
@@ -475,6 +477,9 @@ window.__ModuleLoader__.load({
     .dsh-sp__tagDel:hover{color:var(--dsw-alias-state-error-primary)}
     .dsh-sp__tile[data-confirm="true"]{border-color:var(--dsw-alias-state-error-primary)}
     .dsh-sp__tileRemove[data-confirm="true"]{background:var(--dsw-alias-state-error-primary);color:#fff}
+    .dsh-sp__emptyActions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+    .dsh-sp__archiveJump{border-color:light-dark(#3574f0,#7da4ff);color:light-dark(#3574f0,#7da4ff);font-weight:600}
+    .dsh-sp__archiveJump:hover{background:light-dark(#3574f014,#7da4ff1a)}
 .dsh-sp__listScroll,.dsh-sp__textarea,.dsh-sp__preview,.dsh-sp__historyList{scrollbar-width:thin;scrollbar-color:var(--dsw-alias-border-l2) transparent}
 .dsh-sp__listScroll::-webkit-scrollbar,.dsh-sp__textarea::-webkit-scrollbar,.dsh-sp__preview::-webkit-scrollbar,.dsh-sp__historyList::-webkit-scrollbar{width:8px;height:8px}
 .dsh-sp__listScroll::-webkit-scrollbar-thumb,.dsh-sp__textarea::-webkit-scrollbar-thumb,.dsh-sp__preview::-webkit-scrollbar-thumb,.dsh-sp__historyList::-webkit-scrollbar-thumb{background:var(--dsw-alias-border-l2);border-radius:4px}
@@ -3749,6 +3754,20 @@ window.__ModuleLoader__.load({
           .sort((left, right) => right.note.updatedAt - left.note.updatedAt);
       }, [notes, query, selectedTag]);
 
+      // 搜索在主列表无结果时，检查归档里是否有同样的词——防「便签丢了」恐慌。
+      // (Top-level hook: conditional placement broke the hooks order → blank panel.)
+      const archiveMatches = useMemo(() => {
+        const parsed = parseQuery(query);
+        const needle = parsed.needle.toLowerCase();
+        if (needle === '') return [];
+        return archived
+          .filter((note) => (parsed.after === 0 || note.updatedAt >= parsed.after)
+            && (parsed.before === 0 || note.updatedAt <= parsed.before))
+          .filter((note) => needle === ''
+            || note.text.toLowerCase().includes(needle)
+            || note.tags.some((tag) => tag.toLowerCase().includes(needle)));
+      }, [archived, query]);
+
       const statusLabel = (() => {
         if (saveState === 'saving') return t('editor.saving');
         if (saveState === 'saved') return t('editor.saved');
@@ -4191,11 +4210,17 @@ window.__ModuleLoader__.load({
             h('span', { className: 'dsh-sp__emptyIcon' },
               h(trashView ? TrashIcon : todoView ? TasksIcon : query.trim() ? SearchIcon : EmptyIcon, trashView ? { size: 34 } : null)),
             h('span', null, trashView ? t('trash.empty') : todoView ? t('todos.empty') : archiveView ? t('archive.empty') : query.trim() ? t('panel.noResults') : t('panel.empty')),
-            !trashView && !todoView && !archiveView && query.trim() !== '' ? h('button', {
-              type: 'button',
-              className: 'dsh-sp__textBtn',
-              onClick: () => setQuery(''),
-            }, t('panel.clearSearch')) : null));
+            h('div', { className: 'dsh-sp__emptyActions' },
+              !trashView && !todoView && !archiveView && query.trim() !== '' ? h('button', {
+                type: 'button',
+                className: 'dsh-sp__textBtn dsh-sp__chipBtn',
+                onClick: () => setQuery(''),
+              }, t('panel.clearSearch')) : null,
+              listView === 'notes' && query.trim() !== '' && archiveMatches.length > 0 ? h('button', {
+                type: 'button',
+                className: 'dsh-sp__textBtn dsh-sp__chipBtn dsh-sp__archiveJump',
+                onClick: () => setListView('archive'),
+              }, t('panel.archiveMatches') + ' ' + archiveMatches.length) : null)));
         } else if (archiveView) {
           listArea.push(h('div', { className: 'dsh-sp__list' },
             archiveFiltered.map((note) => h(ArchiveCard, {
