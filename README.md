@@ -73,6 +73,7 @@ dsh plugin --profile desktop add github:Chaiyahang/dsh-scratchpad
 | `scratchpad_append` | 追加一段 |
 | `scratchpad_update` | 重写正文，可选替换标签 |
 | `scratchpad_delete` | 删除便签及附件文件 |
+| `scratchpad_archive` | 归档 / 取消归档（`unarchive: true`），归档便签可搜索但不在主列表 |
 
 ## 数据与限制
 
