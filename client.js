@@ -59,6 +59,11 @@ window.__ModuleLoader__.load({
         'data.exportMd': 'Export MD',
         'data.exportMdHint': 'Export every note as one Markdown file (text only, no attachments)',
         'editor.copyCode': 'Copy',
+        'file.screenshot': 'Screenshot',
+        'tags.deleteTag': 'Delete tag',
+        'tags.deletedEverywhere': 'Tag removed from all notes:',
+        'tags.deleteFailed': 'Some tag removals failed',
+        'trash.confirmDelete': 'Sure? Delete forever',
         'trash.title': 'Trash',
         'trash.back': 'Back to notes',
         'trash.empty': 'Trash is empty.',
@@ -188,6 +193,11 @@ window.__ModuleLoader__.load({
         'data.exportMd': '导出 MD',
         'data.exportMdHint': '把全部便签导出为一个 Markdown 文件（文本出口，不含附件）',
         'editor.copyCode': '复制',
+        'file.screenshot': '截图',
+        'tags.deleteTag': '删除标签',
+        'tags.deletedEverywhere': '已从所有便签移除标签：',
+        'tags.deleteFailed': '部分标签删除失败',
+        'trash.confirmDelete': '确认彻底删除？',
         'trash.title': '回收站',
         'trash.back': '返回便签',
         'trash.empty': '回收站是空的。',
@@ -448,7 +458,17 @@ window.__ModuleLoader__.load({
 .dsh-sp__modalNote{font-size:11.5px;line-height:1.6;color:var(--dsw-alias-state-warn-primary)}
 .dsh-sp__toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:70;max-width:80vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-base);border-radius:999px;padding:8px 18px;font-size:12.5px;line-height:1.5;font-family:inherit;box-shadow:0 6px 24px rgba(0,0,0,.25);cursor:pointer}
 .dsh-sp__chipBtn{border:1px solid var(--dsw-alias-border-l1);border-radius:999px;padding:1px 10px}
-.dsh-sp__chipBtn:hover{border-color:light-dark(#3574f0,#7da4ff)}
+    .dsh-sp__chipBtn:hover{border-color:light-dark(#3574f0,#7da4ff)}
+    .dsh-sp__filterTag{display:inline-flex;align-items:center;border:1px solid var(--dsw-alias-border-l1);border-radius:999px;transition:border-color .12s ease}
+    .dsh-sp__filterTag:hover{border-color:light-dark(#3574f0,#7da4ff)}
+    .dsh-sp__filterTag[data-active="true"]{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}
+    .dsh-sp__filterTag .dsh-sp__filter{border:none;background:transparent;padding:1px 4px 1px 10px}
+    .dsh-sp__filterTag .dsh-sp__filter:hover{background:transparent;border:none}
+    .dsh-sp__tagDel{border:none;background:transparent;color:var(--dsw-alias-label-secondary);padding:1px 9px 1px 2px;font-size:11.5px;line-height:1.6;cursor:pointer;opacity:0;transition:opacity .12s ease}
+    .dsh-sp__filterTag:hover .dsh-sp__tagDel{opacity:1}
+    .dsh-sp__tagDel:hover{color:var(--dsw-alias-state-error-primary)}
+    .dsh-sp__tile[data-confirm="true"]{border-color:var(--dsw-alias-state-error-primary)}
+    .dsh-sp__tileRemove[data-confirm="true"]{background:var(--dsw-alias-state-error-primary);color:#fff}
 .dsh-sp__listScroll,.dsh-sp__textarea,.dsh-sp__preview,.dsh-sp__historyList{scrollbar-width:thin;scrollbar-color:var(--dsw-alias-border-l2) transparent}
 .dsh-sp__listScroll::-webkit-scrollbar,.dsh-sp__textarea::-webkit-scrollbar,.dsh-sp__preview::-webkit-scrollbar,.dsh-sp__historyList::-webkit-scrollbar{width:8px;height:8px}
 .dsh-sp__listScroll::-webkit-scrollbar-thumb,.dsh-sp__textarea::-webkit-scrollbar-thumb,.dsh-sp__preview::-webkit-scrollbar-thumb,.dsh-sp__historyList::-webkit-scrollbar-thumb{background:var(--dsw-alias-border-l2);border-radius:4px}
@@ -1734,6 +1754,14 @@ window.__ModuleLoader__.load({
         h('path', { d: 'm16 16 4.5 4.5' }));
     }
 
+    /** Pastes often arrive as anonymous "image.png" — give them a speakable name. */
+    const PASTE_NAME_PATTERN = /^image([\s\d_-]*)\.(png|jpe?g|gif|webp|avif|bmp)$/i;
+    function screenshotName(label, extension) {
+      const d = new Date();
+      const pad = (value) => String(value).padStart(2, '0');
+      return label + ' ' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + pad(d.getMinutes()) + '.' + extension;
+    }
+
     function DownloadIcon() {
       return h(LineIcon, { size: 13 },
         h('path', { d: 'M12 3.5v11' }),
@@ -1837,7 +1865,7 @@ window.__ModuleLoader__.load({
     // Attachments
     // ---------------------------------------------------------------------
 
-    function AttachmentTile({ attachment, onRemove, onOpen, t }) {
+    function AttachmentTile({ attachment, confirming, onRemove, onOpen, t }) {
       const label = attachment.kind === 'image' ? attachment.name : `${attachment.name} (${formatSize(attachment.size)})`;
       const body = attachment.kind === 'image'
         ? h('button', {
@@ -1859,15 +1887,16 @@ window.__ModuleLoader__.load({
             download: attachment.name,
             title: label,
           }, h('span', { className: 'dsh-sp__tileExt' }, extensionOf(attachment.name)));
-      return h('div', { className: 'dsh-sp__tile' },
+      return h('div', { className: 'dsh-sp__tile', 'data-confirm': confirming ? 'true' : 'false' },
         body,
         h('button', {
           type: 'button',
           className: 'dsh-sp__tileRemove',
-          'aria-label': t('editor.remove'),
-          title: t('editor.remove'),
+          'data-confirm': confirming ? 'true' : 'false',
+          'aria-label': confirming ? t('note.confirmDelete') : t('editor.remove'),
+          title: confirming ? t('note.confirmDelete') : t('editor.remove'),
           onClick: () => onRemove(attachment),
-        }, '×'));
+        }, confirming ? '!' : '×'));
     }
 
     function NoteThumb({ attachment, onOpen }) {
@@ -2169,7 +2198,7 @@ window.__ModuleLoader__.load({
           note.tags.map((tag) => h('span', { key: tag, className: 'dsh-sp__noteTag' }, highlightNodes('#' + tag, needle, 'tag-' + tag)))) : null);
     }
 
-    function TrashCard({ note, t, onRestore, onDeleteForever }) {
+    function TrashCard({ note, confirming, t, onRestore, onDeleteForever }) {
       const preview = toPlainExcerpt(note.text).trim();
       const daysLeft = Math.max(1, Math.ceil(((note.deletedAt || 0) + TRASH_RETENTION_MS - Date.now()) / 86400000));
       const meta = [formatTime(note.deletedAt), t('trash.expiresPrefix') + ' ' + daysLeft + ' ' + t('trash.expiresSuffix')].join(' · ');
@@ -2188,10 +2217,10 @@ window.__ModuleLoader__.load({
               type: 'button',
               className: 'dsh-sp__noteBtn',
               'data-danger': 'true',
-              'aria-label': t('trash.deleteForever'),
-              title: t('trash.deleteForever'),
+              'aria-label': confirming ? t('trash.confirmDelete') : t('trash.deleteForever'),
+              title: confirming ? t('trash.confirmDelete') : t('trash.deleteForever'),
               onClick: () => onDeleteForever(note),
-            }, t('trash.deleteForever')))),
+            }, confirming ? t('trash.confirmDelete') : t('trash.deleteForever')))),
         h('span', {
           className: 'dsh-sp__noteText',
           'data-empty': preview ? 'false' : 'true',
@@ -2235,6 +2264,10 @@ window.__ModuleLoader__.load({
       const [confirmId, setConfirmId] = useState(null);
       /** Two-click confirm for "empty the trash" in the list header. */
       const [confirmEmpty, setConfirmEmpty] = useState(false);
+      /** Two-click confirm for removing an attachment tile (files go for good). */
+      const [confirmRemoveId, setConfirmRemoveId] = useState(null);
+      /** Two-click confirm for deleting a trash note forever. */
+      const [confirmForeverId, setConfirmForeverId] = useState(null);
       const [dragging, setDragging] = useState(false);
       const [preview, setPreview] = useState(null);
       /** Siblings of the previewed attachment, for ←/→ navigation. */
@@ -2269,6 +2302,8 @@ window.__ModuleLoader__.load({
       const confirmTimerRef = useRef(0);
       const trashTimerRef = useRef(0);
       const emptyTimerRef = useRef(0);
+      const removeTimerRef = useRef(0);
+      const foreverTimerRef = useRef(0);
       const searchInputRef = useRef(null);
       const textareaRef = useRef(null);
       const imageInputRef = useRef(null);
@@ -2636,7 +2671,12 @@ window.__ModuleLoader__.load({
             // 压缩/缩略图失败不阻塞上传——回退到原图
           }
           try {
-            const uploaded = await uploadAttachment(uploadFile);
+            let named = uploadFile;
+            if (named.type.startsWith('image/') && (named.name === '' || PASTE_NAME_PATTERN.test(named.name))) {
+              const extension = (named.name.split('.').pop() || 'png').toLowerCase();
+              named = new File([named], screenshotName(t('file.screenshot'), extension), { type: named.type, lastModified: Date.now() });
+            }
+            const uploaded = await uploadAttachment(named);
             accepted.push({ ...uploaded, thumbName: thumbName || null });
           } catch {
             rejected.push(file.name || 'attachment');
@@ -2662,20 +2702,34 @@ window.__ModuleLoader__.load({
         void deleteRemoteFile(attachment);
       }, [queueDraft, scheduleSave, updateEditor]);
 
+      /** Attachment tiles delete files for good — two clicks, 3s timeout. */
+      const handleRemoveClick = useCallback((attachment) => {
+        if (confirmRemoveId === attachment.id) {
+          window.clearTimeout(removeTimerRef.current);
+          setConfirmRemoveId(null);
+          removeAttachment(attachment);
+          return;
+        }
+        setConfirmRemoveId(attachment.id);
+        window.clearTimeout(removeTimerRef.current);
+        removeTimerRef.current = window.setTimeout(() => setConfirmRemoveId(null), 3000);
+      }, [confirmRemoveId, removeAttachment]);
+
       const startDraft = useCallback(async () => {
         const saved = await flush(true);
         if (saved) clearDraft();
         dirtyRef.current = false;
         setConflict(null);
         baseRef.current = 0;
-        updateEditor(emptyEditor());
+        // Jotting inside a tag-filtered feed: the new note joins that context.
+        updateEditor({ ...emptyEditor(), tags: selectedTag !== '' ? [selectedTag] : [] });
         setSaveState('idle');
         setPreviewMode(false);
         setHistoryOpen(false);
         setTagDraft('');
         setComposerOpen(true);
         window.setTimeout(() => textareaRef.current?.focus(), 0);
-      }, [flush, updateEditor]);
+      }, [flush, updateEditor, selectedTag]);
 
       // New-note shortcut: consumed here when mounted, or once the panel mounts.
       useEffect(() => {
@@ -2747,6 +2801,11 @@ window.__ModuleLoader__.load({
         setSaveState('saved');
         setTagDraft('');
         setComposerOpen(true);
+        // Keep the feed and editor in sync: bring the opened card into view.
+        window.setTimeout(() => {
+          const element = document.querySelector('.dsh-sp__listScroll [data-active="true"]');
+          if (element) element.scrollIntoView({ block: 'nearest' });
+        }, 60);
         textareaRef.current?.focus();
       }, [flush, updateEditor]);
 
@@ -2954,6 +3013,19 @@ window.__ModuleLoader__.load({
           }
         })();
       }, []);
+
+      /** Two-click confirm for deleting a trash note forever. */
+      const requestDeleteForever = useCallback((note) => {
+        if (confirmForeverId !== note.id) {
+          setConfirmForeverId(note.id);
+          window.clearTimeout(foreverTimerRef.current);
+          foreverTimerRef.current = window.setTimeout(() => setConfirmForeverId(null), 3000);
+          return;
+        }
+        window.clearTimeout(foreverTimerRef.current);
+        setConfirmForeverId(null);
+        deleteForever(note);
+      }, [confirmForeverId, deleteForever]);
 
       /** Two-click confirm, then hard-delete every trashed note and its files. */
       const emptyTrash = useCallback(() => {
@@ -3403,6 +3475,40 @@ window.__ModuleLoader__.load({
         }
       }, [importPreview, t, updateEditor]);
 
+      /** Remove a tag from every note that carries it (409s rebase and retry). */
+      const removeTagEverywhere = useCallback((tag) => {
+        const targets = [...notes, ...archived].filter((item) => item.tags.includes(tag));
+        if (targets.length === 0) return;
+        void (async () => {
+          let failed = 0;
+          for (const target of targets) {
+            let current = target;
+            for (let tries = 2; tries >= 0; tries -= 1) {
+              try {
+                const next = copyOf(current);
+                next.tags = next.tags.filter((item) => item !== tag);
+                next.updatedAt = Date.now();
+                const body = await saveNoteRemote(next, current.updatedAt);
+                applyToNotes(body.note);
+                revisionRef.current = Math.max(revisionRef.current, body.revision || 0);
+                if (editorRef.current.id === current.id && !dirtyRef.current) {
+                  updateEditor(copyOf(body.note));
+                  baseRef.current = body.note.updatedAt;
+                }
+                break;
+              } catch (error) {
+                const storedNote = error?.status === 409 ? error.body?.note : null;
+                if (storedNote && tries > 0) { current = storedNote; continue; }
+                failed += 1;
+                break;
+              }
+            }
+          }
+          setNotice(failed > 0 ? t('tags.deleteFailed') + ' ×' + failed : t('tags.deletedEverywhere') + ' ' + tag);
+          if (selectedTag === tag) setSelectedTag('');
+        })();
+      }, [notes, archived, applyToNotes, updateEditor, t, selectedTag]);
+
       const allTags = useMemo(() => {
         const counts = new Map();
         for (const note of notes) {
@@ -3469,10 +3575,14 @@ window.__ModuleLoader__.load({
           if (importPreview) setImportPreview(null);
           else if (historyOpen) setHistoryOpen(false);
           else if (listView !== 'notes') setListView('notes');
+          else if (query !== '' && document.activeElement === searchInputRef.current) {
+            setQuery('');
+            searchInputRef.current?.blur();
+          }
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-      }, [importPreview, historyOpen, listView]);
+      }, [importPreview, historyOpen, listView, query]);
 
       // ↑/↓ walk the feed, ↵ opens, Esc dismisses. Typing surfaces keep their
       // keys; the search box hands off with ↓/↑ without leaving the box.
@@ -3755,8 +3865,9 @@ window.__ModuleLoader__.load({
           editor.attachments.map((attachment) => h(AttachmentTile, {
             key: attachment.id,
             attachment,
+            confirming: confirmRemoveId === attachment.id,
             t,
-            onRemove: removeAttachment,
+            onRemove: handleRemoveClick,
             onOpen: (item) => openPreview(item, editor.attachments),
           }))) : null,
         h('div', { className: 'dsh-sp__tags' },
@@ -3964,13 +4075,20 @@ window.__ModuleLoader__.load({
             'data-active': selectedTag === '' ? 'true' : 'false',
             onClick: () => setSelectedTag(''),
           }, t('tags.all') + ' ' + notes.length),
-          allTags.map(([tag, count]) => h('button', {
-            key: tag,
-            type: 'button',
-            className: 'dsh-sp__filter',
-            'data-active': selectedTag === tag ? 'true' : 'false',
-            onClick: () => setSelectedTag(selectedTag === tag ? '' : tag),
-          }, tag + ' ' + count))));
+          allTags.map(([tag, count]) => h('span', { key: tag, className: 'dsh-sp__filterTag', 'data-active': selectedTag === tag ? 'true' : 'false' },
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__filter',
+              'data-active': selectedTag === tag ? 'true' : 'false',
+              onClick: () => setSelectedTag(selectedTag === tag ? '' : tag),
+            }, tag + ' ' + count),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sp__tagDel',
+              'aria-label': t('tags.deleteTag') + ' ' + tag,
+              title: t('tags.deleteTag') + ' ' + tag,
+              onClick: () => removeTagEverywhere(tag),
+            }, '×')))));
         }
         feedChildren.push(h('input', {
           ref: importInputRef,
@@ -4014,7 +4132,8 @@ window.__ModuleLoader__.load({
               note,
               t,
               onRestore: restoreNote,
-              onDeleteForever: deleteForever,
+              onDeleteForever: requestDeleteForever,
+              confirming: confirmForeverId === note.id,
             }))));
         } else if (todoView) {
           const groups = todoGroups
