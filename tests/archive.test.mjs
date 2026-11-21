@@ -66,6 +66,15 @@ try {
   const mdNone = await harness.request('POST', '/api/scratchpad/export-md', { json: { ids: ['missing-id'] } });
   assert(!mdNone.buffer.toString('utf8').includes('## '), 'md export with no matching ids yields an empty document');
 
+  // Agent archive tool: archive + unarchive round trip.
+  await harness.runTool('scratchpad_create', { text: 'agent archive target' });
+  const agentTarget = (await harness.request('GET', NOTES)).body.notes.find((item) => item.text === 'agent archive target');
+  await harness.runTool('scratchpad_archive', { id: agentTarget.id });
+  list = await harness.request('GET', NOTES, { query: { include: 'trash' } });
+  assert(list.body.archived.some((item) => item.id === agentTarget.id), 'scratchpad_archive archives a note');
+  await harness.runTool('scratchpad_archive', { id: agentTarget.id, unarchive: true });
+  list = await harness.request('GET', NOTES, { query: { include: 'trash' } });
+  assert(list.body.notes.some((item) => item.id === agentTarget.id && !item.archivedAt), 'scratchpad_archive unarchive restores');
   console.log('archive test passed');
 } finally {
   await harness.cleanup();

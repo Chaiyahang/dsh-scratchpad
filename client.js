@@ -47,6 +47,8 @@ window.__ModuleLoader__.load({
         'panel.restored': 'Note restored.',
         'panel.dismissToast': 'Dismiss',
         'panel.loadError': 'Could not read the note store. Check that the plugin host side is running.',
+        'panel.offline': 'Connection lost — retrying…',
+        'panel.storage': 'Attachments',
         'panel.draftRestored': 'Restored an unsaved draft.',
         'panel.deleted': 'Note deleted — kept for 7 days.',
         'panel.undo': 'Undo',
@@ -83,6 +85,7 @@ window.__ModuleLoader__.load({
         'history.restore': 'Restore',
         'history.empty': 'No earlier versions yet.',
         'history.close': 'Close',
+        'history.toggle': 'Click to toggle full text',
         'editor.placeholder': 'Jot an idea down…',
         'editor.image': 'Image',
         'editor.file': 'File',
@@ -181,6 +184,8 @@ window.__ModuleLoader__.load({
         'panel.restored': '已恢复到便签列表。',
         'panel.dismissToast': '点击关闭',
         'panel.loadError': '无法读取便签存储，请确认插件 Host 端已加载。',
+        'panel.offline': '连接中断，正在重试…',
+        'panel.storage': '附件占用',
         'panel.draftRestored': '已恢复上次未保存的草稿。',
         'panel.deleted': '便签已删除，7 天内可恢复。',
         'panel.undo': '撤销',
@@ -217,6 +222,7 @@ window.__ModuleLoader__.load({
         'history.restore': '恢复此版本',
         'history.empty': '还没有更早的版本。',
         'history.close': '关闭',
+        'history.toggle': '点击展开 / 收起全文',
         'editor.placeholder': '随手记点什么…',
         'editor.image': '图片',
         'editor.file': '文件',
@@ -494,7 +500,8 @@ window.__ModuleLoader__.load({
 .dsh-sp__historyTitle{font-size:12.5px;font-weight:600;line-height:1.5;color:var(--dsw-alias-label-primary)}
 .dsh-sp__historyItem{border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:6px 10px;background:var(--dsw-alias-bg-layer-2)}
 .dsh-sp__historyMeta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
-.dsh-sp__historyText{margin-top:2px;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.dsh-sp__historyText{margin-top:2px;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.dsh-sp__historyText[data-expanded="true"]{display:block;-webkit-line-clamp:unset}
 .dsh-sp__mdTableWrap{margin:0 0 8px;overflow-x:auto}
 .dsh-sp__mdTable{border-collapse:collapse;font-size:12.5px;line-height:1.55}
 .dsh-sp__mdTable th,.dsh-sp__mdTable td{border:1px solid var(--dsw-alias-border-l1);padding:3px 8px;text-align:left;vertical-align:top;word-break:break-word}
@@ -861,7 +868,7 @@ window.__ModuleLoader__.load({
      * GFM tables and paragraphs. Task boxes call `onToggleTask(lineIndex)`
      * with the raw source line.
      */
-    function renderMarkdown(text, onToggleTask, taskLabel, copyLabel) {
+    function renderMarkdown(text, onToggleTask, taskLabel, copyLabel, needle) {
       const lines = String(text).split('\n');
       const blocks = [];
       let i = 0;
@@ -896,7 +903,7 @@ window.__ModuleLoader__.load({
           blocks.push(h(`h${level + 1}`, {
             key: `h${i}`,
             className: `dsh-sp__mdH dsh-sp__mdH${level}`,
-          }, renderInline(heading[2])));
+          }, renderInline(heading[2], needle)));
           i += 1;
           continue;
         }
@@ -915,7 +922,7 @@ window.__ModuleLoader__.load({
             h('span', {
               className: 'dsh-sp__mdTaskText',
               'data-done': done ? 'true' : 'false',
-            }, renderInline(task[2]))));
+            }, renderInline(task[2], needle))));
           i += 1;
           continue;
         }
@@ -943,7 +950,7 @@ window.__ModuleLoader__.load({
           const items = [];
           const start = i;
           while (i < lines.length && /^\s*[-*]\s+/.test(lines[i]) && !/^\s*[-*]\s+\[[ xX]\]/.test(lines[i])) {
-            items.push(h('li', { key: `li${i}` }, renderInline(lines[i].replace(/^\s*[-*]\s+/, ''))));
+            items.push(h('li', { key: `li${i}` }, renderInline(lines[i].replace(/^\s*[-*]\s+/, ''), needle)));
             i += 1;
           }
           blocks.push(h('ul', { key: `ul${start}`, className: 'dsh-sp__mdList' }, items));
@@ -953,7 +960,7 @@ window.__ModuleLoader__.load({
           const items = [];
           const start = i;
           while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
-            items.push(h('li', { key: `li${i}` }, renderInline(lines[i].replace(/^\s*\d+\.\s+/, ''))));
+            items.push(h('li', { key: `li${i}` }, renderInline(lines[i].replace(/^\s*\d+\.\s+/, ''), needle)));
             i += 1;
           }
           blocks.push(h('ol', { key: `ol${start}`, className: 'dsh-sp__mdList' }, items));
@@ -966,7 +973,7 @@ window.__ModuleLoader__.load({
             quoted.push(lines[i].replace(/^\s*>\s?/, ''));
             i += 1;
           }
-          blocks.push(h('blockquote', { key: `q${start}`, className: 'dsh-sp__mdQuote' }, renderInline(quoted.join('\n'))));
+          blocks.push(h('blockquote', { key: `q${start}`, className: 'dsh-sp__mdQuote' }, renderInline(quoted.join('\n'), needle)));
           continue;
         }
         if (line.trim() === '') {
@@ -980,7 +987,7 @@ window.__ModuleLoader__.load({
           paragraph.push(lines[i]);
           i += 1;
         }
-        blocks.push(h('p', { key: `p${start}`, className: 'dsh-sp__mdP' }, renderInline(paragraph.join('\n'))));
+        blocks.push(h('p', { key: `p${start}`, className: 'dsh-sp__mdP' }, renderInline(paragraph.join('\n'), needle)));
       }
       return blocks;
     }
@@ -2239,6 +2246,8 @@ window.__ModuleLoader__.load({
       const [ready, setReady] = useState(false);
       const [loadError, setLoadError] = useState(false);
       const [loadErrorMessage, setLoadErrorMessage] = useState('');
+      /** Three consecutive poll failures: the Host is probably restarting. */
+      const [offline, setOffline] = useState(false);
       const [editor, setEditor] = useState(emptyEditor);
       const [saveState, setSaveState] = useState('idle');
       const [notice, setNotice] = useState('');
@@ -2286,6 +2295,8 @@ window.__ModuleLoader__.load({
       const [historyOpen, setHistoryOpen] = useState(false);
       /** Versions from the Host; null while loading. */
       const [historyItems, setHistoryItems] = useState(null);
+      /** Expanded history entry key (updatedAt-index) for the full-text view. */
+      const [expandedHistory, setExpandedHistory] = useState(null);
       /** Keyboard cursor into the notes feed; -1 = none. */
       const [cursorIndex, setCursorIndex] = useState(-1);
       /** Feed render cap: grows on 显示更多 or when the cursor walks past it. */
@@ -2296,6 +2307,8 @@ window.__ModuleLoader__.load({
       const baseRef = useRef(0);
       /** Store revision this panel last applied; drives conditional polls. */
       const revisionRef = useRef(0);
+      /** Consecutive poll failures, for the offline banner. */
+      const pollFailRef = useRef(0);
       const pendingRef = useRef(null);
       const dirtyRef = useRef(false);
       const timerRef = useRef(0);
@@ -2478,6 +2491,8 @@ window.__ModuleLoader__.load({
             const since = revisionRef.current;
             const snapshot = await fetchSnapshot(since);
             if (!alive) return;
+            pollFailRef.current = 0;
+            setOffline(false);
             setLoadError(false);
             setLoadErrorMessage('');
             if (snapshot.revision === revisionRef.current) return; // nothing changed anywhere
@@ -2507,7 +2522,12 @@ window.__ModuleLoader__.load({
               setSaveState('saved');
               if (contentChanged) setNotice(t('panel.updatedElsewhere'));
             }
-          } catch {} finally {
+          } catch {
+            // Consecutive poll failures mean the Host is (probably) restarting:
+            // surface it instead of silently showing stale data.
+            pollFailRef.current += 1;
+            if (pollFailRef.current >= 3) setOffline(true);
+          } finally {
             busy = false;
           }
         };
@@ -3121,6 +3141,7 @@ window.__ModuleLoader__.load({
         if (!id) return;
         setHistoryOpen(true);
         setHistoryItems(null);
+        setExpandedHistory(null);
         try {
           const body = await apiJson(API + '/notes/history?id=' + encodeURIComponent(id));
           setHistoryItems(Array.isArray(body.history) ? body.history : []);
@@ -3202,11 +3223,58 @@ window.__ModuleLoader__.load({
           void flush(true);
           return;
         }
+        if (event.key === 'Enter' && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+          // Markdown list continuation: Enter on a list line inserts the next
+          // prefix; Enter on an EMPTY list item exits the list.
+          const element = textareaRef.current;
+          if (!element || element.selectionStart !== element.selectionEnd) return;
+          const start = element.selectionStart;
+          const value = element.value;
+          const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+          const lineEnd = value.indexOf('\n', start) === -1 ? value.length : value.indexOf('\n', start);
+          const line = value.slice(lineStart, start);
+          const atLineEnd = start === lineEnd;
+          const trimmed = line.trimStart();
+          const indent = line.slice(0, line.length - trimmed.length);
+          let prefix = null;
+          let nextPrefix = null;
+          const isDash = trimmed[0] === '-' || trimmed[0] === '*';
+          const isTask = isDash && trimmed.length >= 5 && trimmed[1] === ' ' && trimmed[2] === '['
+            && (trimmed[3] === ' ' || trimmed[3] === 'x' || trimmed[3] === 'X') && trimmed[4] === ']' && trimmed[5] === ' ';
+          const isBullet = !isTask && isDash && trimmed.length >= 2 && trimmed[1] === ' ';
+          const dotAt = trimmed.indexOf('. ');
+          const isOrdered = !isTask && !isBullet && dotAt > 0
+            && trimmed.slice(0, dotAt).split('').every((ch) => ch >= '0' && ch <= '9');
+          if (isTask) {
+            prefix = indent + trimmed.slice(0, 4);
+            nextPrefix = indent + trimmed[0] + ' [ ] ';
+          } else if (isBullet) {
+            prefix = indent + trimmed.slice(0, 2);
+            nextPrefix = prefix;
+          } else if (isOrdered) {
+            const num = trimmed.slice(0, dotAt);
+            prefix = indent + num + '. ';
+            nextPrefix = indent + (Number(num) + 1) + '. ';
+          }
+          if (prefix === null) return;
+          const rest = value.slice(start, lineEnd);
+          if (atLineEnd && rest.trim() === '') {
+            // Empty item: exit the list by stripping the prefix from this line.
+            event.preventDefault();
+            const kept = [value.slice(0, lineStart + indent.length), value.slice(start)];
+            applyMarkdownEdit({ text: kept.join(''), start: kept[0].length, end: kept[0].length });
+            return;
+          }
+          event.preventDefault();
+          const parts = [value.slice(0, start), '\n' + nextPrefix, value.slice(start)];
+          applyMarkdownEdit({ text: parts.join(''), start: start + 1 + nextPrefix.length, end: start + 1 + nextPrefix.length });
+          return;
+        }
         if ((event.metaKey || event.ctrlKey) && (event.key === 'b' || event.key === 'i')) {
           event.preventDefault();
           wrapSelection(event.key === 'b' ? '**' : '*');
         }
-      }, [startDraft, wrapSelection, flush]);
+      }, [startDraft, wrapSelection, flush, applyMarkdownEdit]);
 
       /** ⌘/Ctrl-click opens the URL under the caret without leaving edit mode. */
       const onEditorClick = useCallback((event) => {
@@ -3546,6 +3614,12 @@ window.__ModuleLoader__.load({
             || note.tags.some((tag) => tag.toLowerCase().includes(needle)));
       }, [archived, query]);
 
+      /** Total attachment bytes across all lists (rough disk-usage signal). */
+      const attachmentBytes = useMemo(() => [...notes, ...archived, ...trashed].reduce(
+        (total, item) => total + item.attachments.reduce((sum, attachment) => sum + (attachment.size || 0), 0),
+        0,
+      ), [notes, archived, trashed]);
+
       // The cursor indexes into the live-notes feed; reset it whenever that
       // list changes shape (search, tag filter, view switch). Selection too.
       useEffect(() => {
@@ -3820,7 +3894,12 @@ window.__ModuleLoader__.load({
                     className: 'dsh-sp__textBtn',
                     onClick: () => restoreHistoryVersion(entry),
                   }, t('history.restore'))),
-                h('div', { className: 'dsh-sp__historyText' }, toPlainExcerpt(entry.text).trim() || t('note.untitled'))))));
+                h('div', {
+                className: 'dsh-sp__historyText',
+                'data-expanded': expandedHistory === entry.updatedAt + '-' + index ? 'true' : 'false',
+                title: t('history.toggle'),
+                onClick: () => setExpandedHistory(expandedHistory === entry.updatedAt + '-' + index ? null : entry.updatedAt + '-' + index),
+              }, toPlainExcerpt(entry.text).trim() || t('note.untitled'))))));
 
       const editorBody = historyOpen && editor.id ? historyBody : previewMode
         ? h('div', {
@@ -3829,7 +3908,7 @@ window.__ModuleLoader__.load({
           'aria-label': t('editor.preview'),
         }, editor.text.trim() === ''
           ? h('span', { className: 'dsh-sp__previewEmpty' }, t('editor.emptyPreview'))
-          : renderMarkdown(editor.text, toggleTask, t('editor.task'), t('editor.copyCode')))
+          : renderMarkdown(editor.text, toggleTask, t('editor.task'), t('editor.copyCode'), parseQuery(query).needle))
         : h('textarea', {
           ref: textareaRef,
           className: 'dsh-sp__textarea',
@@ -3944,6 +4023,8 @@ window.__ModuleLoader__.load({
           h('kbd', { className: 'dsh-sp__kbd' }, isMacPlatform() ? '⌘↵' : 'Ctrl+↵'), h('span', null, t('editor.jot'))),
         h('div', { className: 'dsh-sp__aboutRow' },
           h('kbd', { className: 'dsh-sp__kbd' }, isMacPlatform() ? 'Fn' : 'Win H'), h('span', null, t('panel.dictation'))),
+        attachmentBytes > 0 ? h('div', { className: 'dsh-sp__aboutRow' },
+          h('span', null, t('panel.storage') + ' ' + formatSize(attachmentBytes))) : null,
         h('div', { className: 'dsh-sp__aboutNote' }, t('panel.localData')));
 
       const feedChildren = [

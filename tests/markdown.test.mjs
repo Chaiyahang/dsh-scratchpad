@@ -158,6 +158,11 @@ assert(isEditableTarget({ tagName: 'TEXTAREA' }) && isEditableTarget({ tagName: 
   && !isEditableTarget(null),
   'editable targets are detected so their keys are never hijacked');
 
+const previewHits = renderMarkdown('hello **world**', () => {}, 'Task', 'Copy', 'world');
+assert(flatten(previewHits).includes('mark'), 'preview search needle highlights inside markdown');
+assert(flatten(renderMarkdown('hello world', () => {}, 'Task', 'Copy', '')).every((token) => token !== 'mark'),
+  'no needle in preview renders no marks');
+
 const parsed = parseQuery('买牛奶 after:7d');
 assert(parsed.needle === '买牛奶' && parsed.after > 0 && parsed.before === 0, 'after tokens split from the needle');
 const parsedAbs = parseQuery('报销 before:2026-12-01 after:2026-11-01');

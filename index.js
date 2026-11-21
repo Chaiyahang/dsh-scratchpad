@@ -1115,6 +1115,34 @@ export function apply(ctx) {
         return `Deleted scratchpad note ${id}.`;
       },
     },
+    {
+      name: 'scratchpad_archive',
+      description: 'Archive or unarchive a Scratchpad note. Archived notes leave the main list, never expire, and remain searchable — scratchpad_list and scratchpad_search mark them as "archived". Use it when the user asks to put finished notes away, or pass unarchive: true to bring an archived note back to the main list.',
+      parameters: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['id'],
+        properties: {
+          id: { type: 'string', description: 'The note id from scratchpad_list or scratchpad_search.' },
+          unarchive: { type: 'boolean', description: 'Pass true to move an archived note back to the main list (default: archive it).' },
+        },
+      },
+      output: textOutput(),
+      async execute(args, exec) {
+        exec.signal.throwIfAborted();
+        const id = typeof args?.id === 'string' ? args.id : '';
+        const archiving = args?.unarchive !== true;
+        const state = await readState();
+        if (!findNote(state, id)) return `No scratchpad note with id "${id}". Call scratchpad_list to see the available notes.`;
+        await mutate((current) => {
+          const note = findNote(current, id);
+          if (!note) return;
+          note.archivedAt = archiving ? Date.now() : 0;
+          note.updatedAt = Date.now();
+        });
+        return (archiving ? 'Archived scratchpad note ' : 'Unarchived scratchpad note ') + id + '.';
+      },
+    },
   ];
 
   // -------------------------------------------------------------------
